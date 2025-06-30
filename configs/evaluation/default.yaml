@@ -1,0 +1,36 @@
+# Default evaluation configuration
+
+# ROUGE metrics
+rouge:
+  enabled: true
+  types: ["rouge1", "rouge2", "rougeL"]
+  use_stemmer: true
+
+# Rule-based metrics
+rule_metrics:
+  enabled: true
+  detailed: true
+
+# FENICE evaluation (will be added in Phase B)
+fenice:
+  enabled: false
+  model_name: "microsoft/deberta-v3-large"
+  batch_size: 16
+
+# Generation settings for evaluation
+generation:
+  num_beams: 4
+  length_penalty: 1.0
+  no_repeat_ngram_size: 3
+  early_stopping: true
+
+# Output settings
+output:
+  save_predictions: true
+  save_metrics: true
+  save_detailed_results: false
+
+# Evaluation dataset
+eval_dataset:
+  subset_size: 1000  # Evaluate on subset for speed
+  random_seed: 42
