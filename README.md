@@ -4,19 +4,46 @@ This repository contains the implementation plan for a tool-augmented summarizer
 
 ## Quick Start: Creating GitHub Issues
 
-Two files have been created to help you create the necessary GitHub issues:
+### Automated Issue Creation (Recommended)
 
-### 1. `quick_issues.md` 
+Use the provided script to automatically create all GitHub issues:
+
+```bash
+# Make sure you have GitHub CLI installed and authenticated
+gh auth login
+
+# Run the issue creation script
+./create_issues.sh
+```
+
+The script will:
+- Parse all 21 issues from `quick_issues.md`
+- Create appropriate labels automatically
+- Create issues with proper titles, descriptions, and labels
+- Respect the project structure and phases
+
+### Manual Issue Creation
+
+Two files have been created for manual issue creation:
+
+#### 1. `quick_issues.md` 
 **Use this for fast issue creation**
 - Contains 21 ready-to-copy issue templates
 - Each issue has title, labels, description, tasks, and acceptance criteria
 - Simply copy each section and paste into GitHub's "New Issue" form
 
-### 2. `github_issues.md`
+#### 2. `github_issues.md`
 **Use this for detailed planning**
 - Comprehensive document with full issue descriptions
 - Includes dependencies, timeline estimates, and priority levels
 - Contains detailed technical specifications for each task
+
+## Prerequisites
+
+For automated issue creation:
+- [GitHub CLI](https://cli.github.com/) installed and authenticated
+- Bash shell (Linux/macOS/WSL)
+- Write access to the repository
 
 ## Project Overview
 
