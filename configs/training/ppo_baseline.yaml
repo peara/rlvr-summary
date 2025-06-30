@@ -1,0 +1,41 @@
+# PPO training configuration for baseline RL-VR (Phase A)
+
+_target_: trl.PPOConfig
+
+# Training parameters
+learning_rate: 1.41e-5
+batch_size: 16
+mini_batch_size: 4
+gradient_accumulation_steps: 1
+
+# PPO-specific parameters
+ppo_epochs: 4
+clip_range: 0.2
+clip_range_vf: null
+vf_coef: 0.1
+ent_coef: 0.01
+target_kl: 0.1
+
+# Training schedule
+max_steps: 10000
+warmup_steps: 100
+logging_steps: 10
+save_steps: 1000
+eval_steps: 500
+
+# Model parameters
+max_length: 1024
+max_prompt_length: 512
+
+# Optimization
+optimizer: "adamw"
+weight_decay: 0.01
+max_grad_norm: 1.0
+
+# Scheduler
+lr_scheduler_type: "cosine"
+num_train_epochs: 1
+
+# Early stopping
+early_stopping: true
+early_stopping_patience: 3
