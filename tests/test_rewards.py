@@ -18,6 +18,9 @@ from rlvr_summary.rewards import (
     create_default_rule_bundle,
     load_rule_bundle_from_config,
     TextProcessor,
+    RewardSystemIntegrator,
+    create_reward_integrator,
+    create_reward_function,
 )
 
 
@@ -403,6 +406,78 @@ class TestRuleBundleRewardSystem:
         assert len(result.rule_scores) == 0
 
 
+class TestRewardSystemIntegrator:
+    """Test the reward system integrator."""
+    
+    def test_basic_integration(self):
+        """Test basic integrator functionality."""
+        integrator = create_reward_integrator()
+        
+        source = "John Smith works at Microsoft with 1000 employees."
+        summary = "John Smith is at Microsoft which has 1000 employees."
+        
+        # Test single evaluation
+        score = integrator.compute_reward(source, summary)
+        assert 0.0 <= score <= 1.0
+        
+        # Test statistics
+        stats = integrator.get_cumulative_statistics()
+        assert stats["total_evaluations"] == 1
+        assert "average_scores" in stats
+        assert "average_pass_rates" in stats
+    
+    def test_batch_integration(self):
+        """Test batch processing in integrator."""
+        integrator = create_reward_integrator()
+        
+        sources = [
+            "John Smith works at Microsoft.",
+            "The company has 1000 employees.",
+        ]
+        summaries = [
+            "John Smith is at Microsoft.",
+            "Company employs 1000 people.",
+        ]
+        
+        scores = integrator.compute_reward_batch(sources, summaries)
+        
+        assert len(scores) == 2
+        for score in scores:
+            assert 0.0 <= score <= 1.0
+        
+        stats = integrator.get_cumulative_statistics()
+        assert stats["total_evaluations"] == 2
+    
+    def test_milestone_evaluation(self):
+        """Test milestone criteria evaluation."""
+        integrator = create_reward_integrator()
+        
+        # Test with no evaluations
+        milestone = integrator.evaluate_milestone_criteria(target_pass_rate=0.2)
+        assert milestone["milestone_met"] is False
+        assert milestone["evaluations"] == 0
+        
+        # Add some evaluations
+        sources = ["Test source"] * 5
+        summaries = [" ".join(["word"] * 40)] * 5  # Good length summaries
+        
+        integrator.compute_reward_batch(sources, summaries)
+        
+        milestone = integrator.evaluate_milestone_criteria(target_pass_rate=0.2)
+        assert milestone["evaluations"] == 5
+        assert "current_pass_rate" in milestone
+    
+    def test_reward_function_creation(self):
+        """Test creating simple reward function."""
+        reward_fn = create_reward_function()
+        
+        source = "John Smith works at Microsoft."
+        summary = "John Smith is at Microsoft."
+        
+        score = reward_fn(source, summary)
+        assert 0.0 <= score <= 1.0
+
+
 def run_all_tests():
     """Run all tests manually."""
     print("Running reward system tests...")
@@ -466,6 +541,15 @@ def run_all_tests():
     test_system.test_config_loading()
     test_system.test_error_handling()
     print("✓ RuleBundleRewardSystem tests passed")
+    
+    # Test RewardSystemIntegrator
+    print("Testing RewardSystemIntegrator...")
+    test_integrator = TestRewardSystemIntegrator()
+    test_integrator.test_basic_integration()
+    test_integrator.test_batch_integration()
+    test_integrator.test_milestone_evaluation()
+    test_integrator.test_reward_function_creation()
+    print("✓ RewardSystemIntegrator tests passed")
     
     print("\n✅ All reward system tests passed successfully!")
 

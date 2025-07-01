@@ -13,6 +13,11 @@ from .rule_bundle import (
     load_rule_bundle_from_config,
     create_default_rule_bundle,
 )
+from .integration import (
+    RewardSystemIntegrator,
+    create_reward_integrator,
+    create_reward_function,
+)
 
 __all__ = [
     "BaseRule",
@@ -26,4 +31,7 @@ __all__ = [
     "RuleBundleRewardSystem",
     "load_rule_bundle_from_config",
     "create_default_rule_bundle",
+    "RewardSystemIntegrator",
+    "create_reward_integrator",
+    "create_reward_function",
 ]
