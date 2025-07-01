@@ -9,6 +9,7 @@ from .preprocessors import TextPreprocessor
 from .validators import DataValidator
 from .batch_processor import BatchProcessor
 from .annotations import JSONAnnotationHandler
+from .simple_loader import SimpleDataLoader, create_data_loader
 
 __all__ = [
     "CNNDMLoader",
@@ -16,4 +17,6 @@ __all__ = [
     "DataValidator",
     "BatchProcessor",
     "JSONAnnotationHandler",
+    "SimpleDataLoader",
+    "create_data_loader",
 ]

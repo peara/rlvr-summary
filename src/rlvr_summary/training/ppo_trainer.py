@@ -107,24 +107,28 @@ class PPOTrainingLoop:
         
         self.logger.info("PPO training loop setup complete!")
     
-    def create_dummy_dataset(self, size: int = 100) -> List[Dict[str, str]]:
-        """Create a dummy dataset for testing.
+    def load_datasets(self) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
+        """Load training and evaluation datasets.
         
-        Args:
-            size: Dataset size
-            
         Returns:
-            List of dataset examples
+            Tuple of (train_dataset, eval_dataset)
         """
-        # This is a placeholder - in real implementation this would load CNN/DailyMail
-        examples = []
-        for i in range(size):
-            examples.append({
-                "article": f"This is a sample article number {i}. " * 10,
-                "summary": f"This is a sample summary for article {i}.",
-                "id": f"sample_{i}",
-            })
-        return examples
+        from ..data import create_data_loader
+        
+        data_loader = create_data_loader()
+        
+        # Load datasets
+        train_dataset = data_loader.load_data("train", size=self.config.get("train_size", 1000))
+        eval_dataset = data_loader.load_data("eval", size=self.config.get("eval_size", 100))
+        
+        # Log dataset statistics
+        train_stats = data_loader.get_dataset_stats(train_dataset)
+        eval_stats = data_loader.get_dataset_stats(eval_dataset)
+        
+        self.logger.info(f"Training dataset: {train_stats}")
+        self.logger.info(f"Evaluation dataset: {eval_stats}")
+        
+        return train_dataset, eval_dataset
     
     def prepare_batch(self, examples: List[Dict[str, str]]) -> Dict[str, List]:
         """Prepare a batch for training.
@@ -364,9 +368,8 @@ class PPOTrainingLoop:
         
         self.logger.info(f"Starting PPO training for {self.total_steps} steps...")
         
-        # Create dummy datasets
-        train_dataset = self.create_dummy_dataset(1000)
-        eval_dataset = self.create_dummy_dataset(100)
+        # Load datasets
+        train_dataset, eval_dataset = self.load_datasets()
         
         # Training configuration
         batch_size = self.config.get("batch_size", 16)
