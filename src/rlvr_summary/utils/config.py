@@ -26,15 +26,20 @@ def load_config(
         Loaded configuration as DictConfig
     """
     if config_path is None:
-        # Default to configs directory relative to project root
-        project_root = Path(__file__).parent.parent.parent.parent
-        config_path = str(project_root / "configs")
+        # Default to configs directory relative to current working directory
+        config_path = os.path.join(os.getcwd(), "configs")
+    else:
+        # Convert relative paths to absolute paths
+        if not os.path.isabs(config_path):
+            config_path = os.path.join(os.getcwd(), config_path)
     
     # Clear any existing Hydra instance
     if GlobalHydra().is_initialized():
         GlobalHydra.instance().clear()
     
-    with initialize(config_path=config_path, version_base=None):
+    # Use initialize_config_dir with absolute path for reliability
+    from hydra import initialize_config_dir
+    with initialize_config_dir(config_dir=config_path, version_base=None):
         cfg = compose(config_name=config_name, overrides=overrides or [])
     
     return cfg
