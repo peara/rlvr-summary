@@ -127,6 +127,99 @@ def validate_config(config: DictConfig) -> bool:
     return True
 
 
+def validate_training_config(config: DictConfig, check_files: bool = True) -> Dict[str, Any]:
+    """Enhanced validation for training configuration.
+    
+    Args:
+        config: Configuration to validate
+        check_files: Whether to check for file existence
+        
+    Returns:
+        Dictionary with validation results and warnings
+    """
+    results = {
+        "valid": True,
+        "errors": [],
+        "warnings": [],
+        "missing_files": [],
+        "missing_dependencies": []
+    }
+    
+    try:
+        # Basic config validation
+        validate_config(config)
+    except ValueError as e:
+        results["errors"].append(str(e))
+        results["valid"] = False
+    
+    # Check training-specific sections
+    if "training" in config:
+        training_cfg = config.training
+        
+        # Check required training parameters
+        required_training_params = ["learning_rate", "batch_size", "max_steps"]
+        for param in required_training_params:
+            if param not in training_cfg:
+                results["warnings"].append(f"Missing training parameter: {param}")
+        
+        # Validate parameter ranges
+        if "learning_rate" in training_cfg:
+            lr = training_cfg.learning_rate
+            if not (1e-7 <= lr <= 1e-2):
+                results["warnings"].append(f"Learning rate {lr} may be outside typical range [1e-7, 1e-2]")
+        
+        if "batch_size" in training_cfg:
+            bs = training_cfg.batch_size
+            if bs <= 0:
+                results["errors"].append(f"Batch size must be positive, got {bs}")
+                results["valid"] = False
+    
+    # Check model configuration
+    if "model" in config:
+        model_cfg = config.model
+        if "model_name" not in model_cfg:
+            results["errors"].append("Missing model.model_name in configuration")
+            results["valid"] = False
+    
+    # Check data configuration
+    if "data" in config:
+        data_cfg = config.data
+        if "dataset_name" not in data_cfg:
+            results["warnings"].append("Missing data.dataset_name in configuration")
+    
+    # Check file existence if requested
+    if check_files and "paths" in config:
+        paths = config.paths
+        
+        # Check if data directory exists
+        if "data_dir" in paths:
+            data_dir = Path(paths.data_dir)
+            if not data_dir.exists():
+                results["missing_files"].append(f"Data directory: {data_dir}")
+    
+    # Check for optional dependencies
+    try:
+        import torch
+    except ImportError:
+        results["missing_dependencies"].append("torch")
+    
+    try:
+        import transformers
+    except ImportError:
+        results["missing_dependencies"].append("transformers")
+    
+    try:
+        import trl
+    except ImportError:
+        results["missing_dependencies"].append("trl")
+    
+    if results["missing_dependencies"]:
+        results["errors"].append("Missing required dependencies for training")
+        results["valid"] = False
+    
+    return results
+
+
 def setup_directories(config: DictConfig) -> None:
     """Create necessary directories from config.
     

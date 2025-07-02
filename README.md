@@ -99,11 +99,59 @@ Create these labels in your GitHub repository:
 
 ## Getting Started
 
+### Training Scripts
+
+The project includes automated training scripts that handle configuration validation and dependency checking:
+
+#### Quick Training
+
+For immediate training with validation:
+
+```bash
+# Use default configuration
+python scripts/train_simple.py --dry-run  # Validate configuration only
+python scripts/train_simple.py            # Start training
+
+# Use custom configuration
+python scripts/train_simple.py --config configs/config.yaml --experiment my-experiment
+
+# Enable debugging
+python scripts/train_simple.py --log-level DEBUG --experiment debug-run
+```
+
+#### Advanced Training (requires full dependencies)
+
+```bash
+# Install full dependencies first
+pip install torch transformers trl wandb
+pip install -e .
+
+# Use the enhanced training script
+python scripts/train.py --config configs --experiment full-training
+```
+
+#### Training Script Features
+
+The training scripts provide:
+- **Configuration Validation**: Checks for required settings, valid parameter ranges, and missing files
+- **Dependency Checking**: Verifies that required packages (torch, transformers, trl) are installed
+- **Environment Detection**: Automatically detects CUDA availability and Python version
+- **Directory Setup**: Creates necessary directories for data, outputs, logs, and checkpoints
+- **Clear Error Messages**: Provides meaningful feedback for configuration issues
+- **Configuration Summary**: Shows a detailed overview of training settings before starting
+- **Dry Run Mode**: Validate configuration without starting training
+- **Flexible Configuration**: Supports both file paths and directory paths for configs
+
+### Project Setup
+
 1. Create the GitHub labels listed above
 2. Copy issues from `quick_issues.md` into GitHub
 3. Assign initial priorities and team members
-4. Start with Setup issues (infrastructure and data pipeline)
-5. Follow the phase sequence for implementation
+4. Install dependencies: `pip install -r requirements.txt`
+5. Configure W&B: `wandb login`
+6. Validate setup: `python scripts/train_simple.py --dry-run`
+7. Start with Setup issues (infrastructure and data pipeline)
+8. Follow the phase sequence for implementation
 
 ## Cost Estimates
 
