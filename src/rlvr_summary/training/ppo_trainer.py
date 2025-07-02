@@ -107,6 +107,25 @@ class PPOTrainingLoop:
         
         self.logger.info("PPO training loop setup complete!")
     
+    def create_dummy_dataset(self, size: int) -> List[Dict[str, str]]:
+        """Create a dummy dataset for testing purposes.
+        
+        Args:
+            size: Number of examples to create
+            
+        Returns:
+            List of dictionaries with 'article', 'summary', and 'id' keys
+        """
+        dummy_data = []
+        for i in range(size):
+            example = {
+                "id": f"dummy_{i}",
+                "article": f"This is a dummy article number {i}. It contains some sample text that can be used for testing the summarization pipeline. The article discusses various topics and provides enough content to generate meaningful summaries.",
+                "summary": f"This is a dummy summary for article {i}. It provides a brief overview of the main points."
+            }
+            dummy_data.append(example)
+        return dummy_data
+    
     def load_datasets(self) -> Tuple[List[Dict[str, str]], List[Dict[str, str]]]:
         """Load training and evaluation datasets.
         
