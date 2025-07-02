@@ -185,7 +185,7 @@ class TestConfigurationFiles:
         # Check required sections
         assert "project" in config
         assert "paths" in config
-        assert "project" in config.get("project", {})
+        assert "name" in config.get("project", {})
         
         # Check paths
         paths = config.get("paths", {})

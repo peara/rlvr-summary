@@ -1,0 +1,22 @@
+# CNN/DailyMail dataset configuration
+
+dataset_name: "cnn_dailymail"
+dataset_version: "3.0.0"
+split: "train"
+max_samples: null  # null means use all samples
+cache_dir: "./data/cache"
+
+# Data preprocessing
+max_input_length: 1024
+max_target_length: 128
+min_input_length: 50
+min_target_length: 5
+
+# Data loading
+batch_size: 8
+num_workers: 4
+shuffle: true
+drop_last: false
+
+# Optional local data path
+local_data_path: null  # Path to local dataset files (optional)
