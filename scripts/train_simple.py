@@ -81,12 +81,12 @@ def validate_basic_config(config: Dict[str, Any]) -> Dict[str, Any]:
         # Validate parameter ranges
         if "learning_rate" in training_cfg:
             lr = training_cfg["learning_rate"]
-            if not (1e-7 <= lr <= 1e-2):
+            if isinstance(lr, (int, float)) and not (1e-7 <= lr <= 1e-2):
                 results["warnings"].append(f"Learning rate {lr} may be outside typical range [1e-7, 1e-2]")
         
         if "batch_size" in training_cfg:
             bs = training_cfg["batch_size"]
-            if bs <= 0:
+            if isinstance(bs, (int, float)) and bs <= 0:
                 results["errors"].append(f"Batch size must be positive, got {bs}")
                 results["valid"] = False
     
