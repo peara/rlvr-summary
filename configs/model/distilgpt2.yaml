@@ -11,6 +11,11 @@ load_in_8bit: false
 load_in_4bit: false
 torch_dtype: "auto"
 
+# Tokenizer configuration
+tokenizer:
+  padding_side: "right"  # Use right padding for smaller/standard models
+  trust_remote_code: true
+
 # Generation settings
 generation:
   max_new_tokens: 128  # Reduced for smaller model
