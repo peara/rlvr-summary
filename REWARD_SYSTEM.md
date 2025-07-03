@@ -223,6 +223,41 @@ new_weights = {
 system.update_rule_weights(new_weights)
 ```
 
+## TRL Integration
+
+The reward system now integrates seamlessly with TRL's PPOTrainer for optimized performance:
+
+### TRL Training Loop Integration
+
+```python
+from rlvr_summary.training.ppo_trainer import PPOTrainingLoop
+
+# TRL integration with automatic reward computation
+training_loop = PPOTrainingLoop(config)
+training_loop.setup()  # Automatically sets up reward function
+
+# During TRL training, rewards are computed automatically
+# The training loop handles the conversion between TRL format and reward computation
+```
+
+### Reward Computation Cycle
+
+The TRL integration includes specialized methods for the TRL training cycle:
+
+```python
+# Used internally by TRL training loop
+rewards = training_loop.compute_batch_rewards(prompts, summaries)
+
+# Article extraction from TRL prompt format
+article = training_loop._extract_article_from_prompt(prompt)
+```
+
+**Benefits of TRL Integration:**
+- ✅ Automatic integration with TRL's generation cycle
+- ✅ Optimized memory usage and performance
+- ✅ Built-in logging and metrics tracking
+- ✅ Seamless prompt format conversion
+
 ## Metrics and Logging
 
 ### Rule Evaluation Result
