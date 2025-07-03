@@ -4,6 +4,49 @@ This module provides core data processing infrastructure for the RLVR Summary pr
 
 ## Components
 
+### Data Flow
+
+The pipeline now supports two output formats:
+
+1. **Standard Format** (for custom training loops):
+```python
+{
+    "id": "cnn_0001",
+    "article": "Scientists have discovered...",
+    "summary": "Scientists discover new butterfly species..."
+}
+```
+
+2. **TRL PPOTrainer Format** (optimized for TRL integration):
+```python
+{
+    "input_ids": [101, 2054, 2003, ...],  # Tokenized prompt only
+    "attention_mask": [1, 1, 1, ...],
+    "query": "Summarize: Scientists have discovered...\n\nSummary:",  # Optional
+    "reference": "Scientists discover new butterfly species..."  # For reward computation
+}
+```
+
+### TRL Integration
+
+The data pipeline integrates seamlessly with TRL's PPOTrainer through format conversion:
+
+```python
+from rlvr_summary.training.ppo_trainer import PPOTrainingLoop
+
+# Training loop automatically converts data to TRL format
+training_loop = PPOTrainingLoop(config)
+train_dataset, eval_dataset = training_loop.load_datasets()  # Returns TRL-compatible Dataset objects
+```
+
+**Benefits of TRL Format:**
+- ✅ Highly optimized for memory and performance
+- ✅ Built-in checkpointing, logging, evaluation
+- ✅ Better HuggingFace ecosystem integration
+- ✅ Automatic handling of padding, batching, device placement
+
+## Components
+
 ### 1. Data Loaders (`loaders.py`)
 
 - **CNNDMLoader**: Loads CNN-DailyMail dataset from HuggingFace datasets or local files
