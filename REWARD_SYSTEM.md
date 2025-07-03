@@ -223,40 +223,41 @@ new_weights = {
 system.update_rule_weights(new_weights)
 ```
 
-## TRL Integration
+## VERL Integration
 
-The reward system now integrates seamlessly with TRL's PPOTrainer for optimized performance:
+The reward system now integrates seamlessly with VERL's PPOTrainer for optimized performance:
 
-### TRL Training Loop Integration
+### VERL Training Loop Integration
 
 ```python
 from rlvr_summary.training.ppo_trainer import PPOTrainingLoop
 
-# TRL integration with automatic reward computation
+# VERL integration with automatic reward computation
 training_loop = PPOTrainingLoop(config)
 training_loop.setup()  # Automatically sets up reward function
 
-# During TRL training, rewards are computed automatically
-# The training loop handles the conversion between TRL format and reward computation
+# During VERL training, rewards are computed automatically
+# The training loop handles the conversion between VERL format and reward computation
 ```
 
 ### Reward Computation Cycle
 
-The TRL integration includes specialized methods for the TRL training cycle:
+The VERL integration includes specialized methods for the VERL training cycle:
 
 ```python
-# Used internally by TRL training loop
+# Used internally by VERL training loop
 rewards = training_loop.compute_batch_rewards(prompts, summaries)
 
-# Article extraction from TRL prompt format
+# Article extraction from VERL prompt format
 article = training_loop._extract_article_from_prompt(prompt)
 ```
 
-**Benefits of TRL Integration:**
-- ✅ Automatic integration with TRL's generation cycle
+**Benefits of VERL Integration:**
+- ✅ Automatic integration with VERL's generation cycle
 - ✅ Optimized memory usage and performance
 - ✅ Built-in logging and metrics tracking
 - ✅ Seamless prompt format conversion
+- ✅ Easy customization via functional_reward interface
 
 ## Metrics and Logging
 
@@ -360,30 +361,32 @@ Planned improvements for later phases:
 
 The reward system is designed to integrate seamlessly with RL training frameworks:
 
-### HuggingFace TRL Integration
+### HuggingFace VERL Integration
 
 ```python
-from trl import PPOTrainer
+from verl import PPOTrainer
 from rlvr_summary.rewards import create_reward_function
 
 # Create reward function
 reward_fn = create_reward_function()
 
-# Use in PPO training
-trainer = PPOTrainer(model=model, tokenizer=tokenizer, ...)
+# Use in PPO training with VERL's functional_reward
+from verl.trainer.ppo import functional_reward
 
-for batch in dataloader:
-    # Generate summaries
-    summaries = model.generate(batch["input_ids"])
-    
-    # Compute rewards
+# Create VERL-compatible reward function
+@functional_reward
+def verl_reward_fn(prompts, responses):
     rewards = []
-    for source, summary in zip(batch["source"], summaries):
-        reward = reward_fn(source, summary)
+    for prompt, response in zip(prompts, responses):
+        # Extract article from prompt format
+        article = extract_article_from_prompt(prompt)
+        reward = reward_fn(article, response)
         rewards.append(reward)
-    
-    # Update model
-    trainer.step(batch["input_ids"], summaries, rewards)
+    return rewards
+
+# Use in VERL training
+trainer = PPOTrainer(config=config, policy_model=model, ...)
+trainer.set_reward_function(verl_reward_fn)
 ```
 
 ### Custom Training Loop

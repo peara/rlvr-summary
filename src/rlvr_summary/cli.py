@@ -43,7 +43,7 @@ def train(config: str, experiment: str):
         
     except ImportError as e:
         click.echo(f"❌ Missing dependencies for training: {e}")
-        click.echo("Please install required packages: torch, transformers, trl")
+        click.echo("Please install required packages: torch, transformers, verl")
     except Exception as e:
         click.echo(f"❌ Training failed: {e}")
         raise

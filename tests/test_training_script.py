@@ -123,7 +123,7 @@ class TestTrainingScript:
         assert "python_version" in env_status
         assert "torch_available" in env_status
         assert "transformers_available" in env_status
-        assert "trl_available" in env_status
+        assert "verl_available" in env_status
         assert isinstance(env_status["torch_available"], bool)
     
     @pytest.mark.skipif(not SCRIPT_AVAILABLE, reason="Training script not available")

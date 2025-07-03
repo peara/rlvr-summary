@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Demo script to show TRL integration working."""
+"""Demo script to show VERL integration working."""
 
 import sys
 from pathlib import Path
@@ -50,7 +50,7 @@ class MockDataset:
         return cls(data)
 
 
-def demo_trl_format_conversion():
+def demo_verl_format_conversion():
     """Demonstrate TRL format conversion."""
     
     print("🔄 TRL Format Conversion Demo")
@@ -104,11 +104,11 @@ def demo_trl_format_conversion():
             "id": sample["id"],
         })
     
-    # Create TRL-compatible dataset
-    trl_dataset = MockDataset.from_list(ppo_samples)
+    # Create VERL-compatible dataset
+    verl_dataset = MockDataset.from_list(ppo_samples)
     
-    print("✅ TRL Format Sample:")
-    sample = trl_dataset.data[0]
+    print("✅ VERL Format Sample:")
+    sample = verl_dataset.data[0]
     print(f"ID: {sample['id']}")
     print(f"Input IDs: {sample['input_ids'][:10]}... (length: {len(sample['input_ids'])})")
     print(f"Attention Mask: {sample['attention_mask'][:10]}... (length: {len(sample['attention_mask'])})")
@@ -127,7 +127,7 @@ def demo_trl_format_conversion():
     
     # Show reward computation integration
     print("🏆 Reward Computation Integration:")
-    for i, sample in enumerate(trl_dataset.data[:2]):
+    for i, sample in enumerate(verl_dataset.data[:2]):
         # Extract article from query (for reward computation)
         article = sample['query'].replace(
             "Summarize the following article:\n\n", ""
@@ -146,7 +146,7 @@ def demo_trl_format_conversion():
     print("✅ Memory and performance optimized")
     print("✅ Backward compatibility maintained")
     
-    return trl_dataset
+    return verl_dataset
 
 
 def demo_training_integration():
@@ -156,33 +156,34 @@ def demo_training_integration():
     print("🎯 Training Integration Demo")
     print("=" * 50)
     
-    trl_dataset = demo_trl_format_conversion()
+    verl_dataset = demo_verl_format_conversion()
     
     print("📚 Training Pipeline:")
     print("1. Data Pipeline: CNNDMLoader → TextPreprocessor → DataValidator")
-    print("2. TRL Conversion: _convert_to_ppo_format()")  
+    print("2. VERL Conversion: _convert_to_verl_format()")  
     print("3. PPOTrainer: Uses Dataset with tokenized prompts")
-    print("4. Generation: TRL handles prompt → completion generation")
-    print("5. Rewards: compute_batch_rewards() integrates with TRL cycle")
-    print("6. PPO Updates: Fully managed by TRL framework")
+    print("4. Generation: VERL handles prompt → completion generation")
+    print("5. Rewards: compute_batch_rewards() integrates with VERL cycle")
+    print("6. PPO Updates: Fully managed by VERL framework")
     
     print("\n🔧 Method Signatures:")
-    print("load_datasets() -> Tuple[Dataset, Dataset]  # Now returns TRL format")
-    print("_convert_to_ppo_format(data) -> Dataset     # New conversion method")
-    print("compute_batch_rewards(prompts, summaries) -> List[float]  # TRL integration")
+    print("load_datasets() -> Tuple[Dataset, Dataset]  # Now returns VERL format")
+    print("_convert_to_verl_format(data) -> Dataset     # New conversion method")
+    print("compute_batch_rewards(prompts, summaries) -> List[float]  # VERL integration")
     print("_extract_article_from_prompt(prompt) -> str  # Helper for rewards")
     
     print("\n📊 Performance Benefits:")
-    print("• Reduced memory usage (TRL optimizations)")
+    print("• Reduced memory usage (VERL optimizations)")
     print("• Built-in checkpointing and logging")
     print("• Better HuggingFace ecosystem integration")
     print("• Automatic padding, batching, device placement")
     print("• Less custom PPO code to maintain")
+    print("• Enhanced reward customization via functional_reward")
 
 
 if __name__ == "__main__":
-    print("🎉 TRL PPOTrainer Integration Demo")
-    print("This demonstrates the conversion from raw text format to TRL expected format\n")
+    print("🎉 VERL PPOTrainer Integration Demo")
+    print("This demonstrates the conversion from raw text format to VERL expected format\n")
     
     demo_training_integration()
     

@@ -17,7 +17,7 @@ The pipeline now supports two output formats:
 }
 ```
 
-2. **TRL PPOTrainer Format** (optimized for TRL integration):
+2. **VERL PPOTrainer Format** (optimized for VERL integration):
 ```python
 {
     "input_ids": [101, 2054, 2003, ...],  # Tokenized prompt only
@@ -27,23 +27,24 @@ The pipeline now supports two output formats:
 }
 ```
 
-### TRL Integration
+### VERL Integration
 
-The data pipeline integrates seamlessly with TRL's PPOTrainer through format conversion:
+The data pipeline integrates seamlessly with VERL's PPOTrainer through format conversion:
 
 ```python
 from rlvr_summary.training.ppo_trainer import PPOTrainingLoop
 
-# Training loop automatically converts data to TRL format
+# Training loop automatically converts data to VERL format
 training_loop = PPOTrainingLoop(config)
-train_dataset, eval_dataset = training_loop.load_datasets()  # Returns TRL-compatible Dataset objects
+train_dataset, eval_dataset = training_loop.load_datasets()  # Returns VERL-compatible Dataset objects
 ```
 
-**Benefits of TRL Format:**
+**Benefits of VERL Format:**
 - ✅ Highly optimized for memory and performance
 - ✅ Built-in checkpointing, logging, evaluation
 - ✅ Better HuggingFace ecosystem integration
 - ✅ Automatic handling of padding, batching, device placement
+- ✅ Enhanced reward function customization via functional_reward
 
 ## Components
 

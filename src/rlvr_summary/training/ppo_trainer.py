@@ -1,4 +1,4 @@
-"""PPO training loop implementation using HuggingFace TRL."""
+"""PPO training loop implementation using VERL."""
 
 import json
 import logging
@@ -11,13 +11,15 @@ try:
     import torch
     from datasets import Dataset
     from transformers import PreTrainedModel, PreTrainedTokenizer
-    from trl import PPOConfig, PPOTrainer
+    # VERL imports - following the architecture from VERL documentation
+    from verl import PPOTrainer, PPOConfig
+    from verl.trainer.ppo import functional_reward
 
     TORCH_AVAILABLE = True
-    TRL_AVAILABLE = True
+    VERL_AVAILABLE = True
 except ImportError as e:
     TORCH_AVAILABLE = False
-    TRL_AVAILABLE = False
+    VERL_AVAILABLE = False
     missing_deps = str(e)
 
 from ..evaluation import EvaluationPipeline
@@ -29,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class PPOTrainingLoop:
-    """PPO training loop for RLVR summary model."""
+    """PPO training loop for RLVR summary model using VERL."""
 
     def __init__(
         self,
@@ -38,7 +40,7 @@ class PPOTrainingLoop:
         tokenizer: Optional[PreTrainedTokenizer] = None,
         wandb_logger=None,
     ):
-        """Initialize PPO training loop.
+        """Initialize VERL training loop.
 
         Args:
             config: Training configuration
@@ -46,8 +48,8 @@ class PPOTrainingLoop:
             tokenizer: Pre-loaded tokenizer (optional)
             wandb_logger: W&B logger for experiment tracking
         """
-        if not TORCH_AVAILABLE or not TRL_AVAILABLE:
-            raise ImportError(f"PyTorch and TRL are required: {missing_deps}")
+        if not TORCH_AVAILABLE or not VERL_AVAILABLE:
+            raise ImportError(f"PyTorch and VERL are required: {missing_deps}")
 
         self.config = config
         self.wandb_logger = wandb_logger
@@ -71,7 +73,10 @@ class PPOTrainingLoop:
 
     def setup(self):
         """Set up training components."""
-        self.logger.info("Setting up PPO training loop...")
+        if not TORCH_AVAILABLE or not VERL_AVAILABLE:
+            raise ImportError(f"PyTorch and VERL are required: {missing_deps}")
+
+        self.logger.info("Setting up VERL PPO training loop...")
 
         # Load model and tokenizer if not provided
         if self.model is None or self.tokenizer is None:
@@ -83,7 +88,7 @@ class PPOTrainingLoop:
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Create PPO config
+        # Create VERL PPO config
         ppo_config = PPOConfig(
             output_dir=str(self.checkpoint_dir),
             learning_rate=self.config.get("learning_rate", 1.41e-5),
@@ -95,70 +100,84 @@ class PPOTrainingLoop:
             num_ppo_epochs=self.config.get("ppo_epochs", 4),
             max_grad_norm=self.config.get("max_grad_norm", 1.0),
             seed=self.config.get("seed", 42),
-            report_to="wandb" if self.wandb_logger else None,
-            exp_name=self.config.get("exp_name", "ppo_training"),
-            response_length=self.config.get("max_new_tokens", 256),
+            # VERL-specific configuration
+            max_new_tokens=self.config.get("max_new_tokens", 256),
             temperature=self.config.get("temperature", 0.7),
+            top_k=self.config.get("top_k", 50),
+            top_p=self.config.get("top_p", 0.95),
         )
 
-        # Initialize PPO trainer
-        self.logger.info("Initializing PPO trainer...")
+        # Initialize VERL PPO trainer
+        self.logger.info("Initializing VERL PPO trainer...")
 
-        # Memory optimization: Move model to device early to avoid device placement issues
+        # Memory optimization: Move model to device early
         if torch.cuda.is_available():
             self.model = self.model.cuda()
-            torch.cuda.empty_cache()  # Clear cache before creating copies
+            torch.cuda.empty_cache()
 
         # Create reference model (copy of policy model)
         self.logger.info("Creating reference model...")
         ref_model = type(self.model)(self.model.config)
         ref_model.load_state_dict(self.model.state_dict())
-        ref_model.eval()  # Reference model should be in eval mode
+        ref_model.eval()
         if torch.cuda.is_available():
             ref_model = ref_model.cuda()
 
-        # Create a simple reward model (we'll use our rule-based rewards)
-        # For now, we'll use the same model architecture but this could be different
-        self.logger.info("Creating reward model...")
-        reward_model = type(self.model)(self.model.config)
-        reward_model.load_state_dict(self.model.state_dict())
-        reward_model.eval()
-        if torch.cuda.is_available():
-            reward_model = reward_model.cuda()
-            torch.cuda.empty_cache()  # Clear cache after loading models
-
-        # Create minimal initial dataset for PPOTrainer initialization
-        # We'll load the full dataset later in the train method
-        self.logger.info("Creating minimal initial dataset for PPOTrainer...")
-        initial_dataset = self._create_minimal_dataset()
-        
+        # Create VERL PPO trainer
         self.ppo_trainer = PPOTrainer(
-            args=ppo_config,
-            processing_class=self.tokenizer,
-            model=self.model,
+            config=ppo_config,
+            policy_model=self.model,
             ref_model=ref_model,
-            reward_model=reward_model,
-            train_dataset=initial_dataset,
-            value_model=self.model,
+            tokenizer=self.tokenizer,
         )
 
-        # Set up reward function
+        # Set up reward function using VERL's functional_reward interface
         self.logger.info("Setting up reward function...")
         self.reward_function = create_reward_function(wandb_logger=self.wandb_logger)
+        
+        # Wrap our reward function for VERL's functional_reward interface
+        self.verl_reward_function = self._create_verl_reward_function()
 
         # Set up evaluation pipeline
         self.evaluation_pipeline = EvaluationPipeline(wandb_logger=self.wandb_logger)
 
-        self.logger.info("PPO training loop setup complete!")
+        self.logger.info("VERL PPO training loop setup complete!")
+
+    def _create_verl_reward_function(self):
+        """Create a VERL-compatible reward function using functional_reward.
+        
+        This follows VERL's functional_reward interface pattern.
+        """
+        def verl_reward_fn(prompts: List[str], responses: List[str]) -> List[float]:
+            """VERL-compatible reward function.
+            
+            Args:
+                prompts: List of input prompts
+                responses: List of generated responses
+                
+            Returns:
+                List of reward scores
+            """
+            rewards = []
+            for prompt, response in zip(prompts, responses):
+                # Extract article from prompt (our prompts contain the article)
+                article = self._extract_article_from_prompt(prompt)
+                # Compute reward using our existing reward function
+                reward = self.reward_function(article, response)
+                rewards.append(reward)
+            return rewards
+        
+        # Use VERL's functional_reward decorator
+        return functional_reward(verl_reward_fn)
 
     def _create_minimal_dataset(self) -> Dataset:
         """Create a minimal dataset for PPOTrainer initialization.
         
-        This creates a small sample dataset to satisfy TRL's initialization requirements.
+        This creates a small sample dataset to satisfy VERL's initialization requirements.
         The actual training dataset will be loaded and set later in the train method.
         
         Returns:
-            Minimal Dataset object with tokenized prompts for TRL PPOTrainer
+            Minimal Dataset object with tokenized prompts for VERL PPOTrainer
         """
         if not self.tokenizer:
             raise ValueError("Tokenizer must be initialized before creating minimal dataset")
@@ -170,23 +189,21 @@ class PPOTrainingLoop:
             "summary": "Minimal sample for initialization.",
         }]
         
-        return self._convert_to_ppo_format(minimal_data)
+        return self._convert_to_verl_format(minimal_data)
 
-
-
-    def _convert_to_ppo_format(self, data: List[Dict[str, str]]) -> Dataset:
-        """Convert processed data to TRL PPOTrainer expected format.
+    def _convert_to_verl_format(self, data: List[Dict[str, str]]) -> Dataset:
+        """Convert processed data to VERL PPOTrainer expected format.
         
         Args:
             data: List of processed data samples with 'article', 'summary', 'id' keys
             
         Returns:
-            Dataset object with tokenized prompts for TRL PPOTrainer
+            Dataset object with tokenized prompts for VERL PPOTrainer
         """
         if not self.tokenizer:
-            raise ValueError("Tokenizer must be initialized before converting to PPO format")
+            raise ValueError("Tokenizer must be initialized before converting to VERL format")
             
-        ppo_samples = []
+        verl_samples = []
         for sample in data:
             # Create standardized prompt
             prompt = f"Summarize the following article:\n\n{sample['article']}\n\nSummary:"
@@ -196,11 +213,11 @@ class PPOTrainingLoop:
                 prompt,
                 max_length=self.config.get("max_prompt_length", 512),
                 truncation=True,
-                padding=False,  # TRL handles padding
+                padding=False,  # VERL handles padding
                 return_tensors=None,
             )
             
-            ppo_samples.append({
+            verl_samples.append({
                 "input_ids": tokenized["input_ids"],
                 "attention_mask": tokenized["attention_mask"],
                 "query": prompt,  # For reward computation
@@ -331,17 +348,17 @@ class PPOTrainingLoop:
                 }
             )
 
-        # Convert to TRL PPOTrainer format
-        self.logger.info("Converting datasets to TRL PPOTrainer format...")
-        train_trl_dataset = self._convert_to_ppo_format(train_dataset)
-        eval_trl_dataset = self._convert_to_ppo_format(eval_dataset)
+        # Convert to VERL PPOTrainer format
+        self.logger.info("Converting datasets to VERL PPOTrainer format...")
+        train_verl_dataset = self._convert_to_verl_format(train_dataset)
+        eval_verl_dataset = self._convert_to_verl_format(eval_dataset)
 
         self.logger.info(
-            f"TRL format conversion complete: "
-            f"train={len(train_trl_dataset)} samples, eval={len(eval_trl_dataset)} samples"
+            f"VERL format conversion complete: "
+            f"train={len(train_verl_dataset)} samples, eval={len(eval_verl_dataset)} samples"
         )
 
-        return train_trl_dataset, eval_trl_dataset
+        return train_verl_dataset, eval_verl_dataset
 
     def prepare_batch(self, examples: List[Dict[str, str]]) -> Dict[str, List]:
         """Prepare a batch for training.
@@ -611,26 +628,21 @@ class PPOTrainingLoop:
         return eval_metrics
 
     def train(self):
-        """Main training loop using TRL PPOTrainer."""
+        """Main training loop using VERL PPOTrainer."""
         if not self.ppo_trainer:
             self.setup()
 
-        self.logger.info(f"Starting PPO training for {self.total_steps} steps...")
+        self.logger.info(f"Starting VERL PPO training for {self.total_steps} steps...")
 
-        # Load datasets (now returns TRL-compatible Dataset objects)
+        # Load datasets (now returns VERL-compatible Dataset objects)
         train_dataset, eval_dataset = self.load_datasets()
 
-        # Update the PPO trainer's dataset with the TRL-formatted dataset
-        self.ppo_trainer.train_dataset = train_dataset
+        # Set up the training with VERL
+        self.ppo_trainer.set_reward_function(self.verl_reward_function)
+        self.ppo_trainer.set_dataset(train_dataset)
 
-        # Set up training configuration for TRL
-        self.ppo_trainer.args.max_steps = self.total_steps
-        self.ppo_trainer.args.logging_steps = self.config.get("logging_steps", 10)
-        self.ppo_trainer.args.save_steps = self.config.get("save_steps", 1000)
-        self.ppo_trainer.args.eval_steps = self.config.get("eval_steps", 500)
-
-        # Use TRL's built-in training loop
-        self.logger.info("Starting TRL PPO training...")
+        # Run VERL training loop
+        self.logger.info("Starting VERL PPO training...")
         self.ppo_trainer.train()
 
         # Final checkpoint

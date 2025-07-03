@@ -1,4 +1,4 @@
-"""Tests for TRL integration and format conversion."""
+"""Tests for VERL integration and format conversion."""
 
 import sys
 from pathlib import Path
@@ -51,11 +51,11 @@ class MockDataset:
         return cls(data)
 
 
-class TestTRLIntegration:
-    """Test TRL format conversion functionality."""
+class TestVERLIntegration:
+    """Test VERL format conversion functionality."""
     
-    def test_convert_to_ppo_format(self):
-        """Test conversion to TRL PPOTrainer format."""
+    def test_convert_to_verl_format(self):
+        """Test conversion to VERL PPOTrainer format."""
         # Mock the dependencies to test the logic
         import unittest.mock as mock
         
@@ -86,7 +86,7 @@ class TestTRLIntegration:
             'torch': mock.MagicMock(),
             'datasets': mock.MagicMock(),
             'transformers': mock.MagicMock(),
-            'trl': mock.MagicMock(),
+            'verl': mock.MagicMock(),
             'omegaconf': mock.MagicMock(),
         }):
             # Import after mocking
@@ -102,7 +102,7 @@ class TestTRLIntegration:
                 training_loop.tokenizer = MockTokenizer()
                 
                 # Test the conversion method
-                result = training_loop._convert_to_ppo_format(test_data)
+                result = training_loop._convert_to_verl_format(test_data)
                 
                 # Validate the result
                 assert len(result) == 2
@@ -125,11 +125,11 @@ class TestTRLIntegration:
                 assert sample["article"] == "This is a test article about science."
                 assert sample["id"] == "test_001"
                 
-                print("✅ TRL format conversion test passed")
+                print("✅ VERL format conversion test passed")
                 return True
                 
             except ImportError as e:
-                print(f"❌ Import error in TRL conversion test: {e}")
+                print(f"❌ Import error in VERL conversion test: {e}")
                 return False
     
     def test_extract_article_from_prompt(self):
@@ -142,7 +142,7 @@ class TestTRLIntegration:
             'torch': mock.MagicMock(),
             'datasets': mock.MagicMock(), 
             'transformers': mock.MagicMock(),
-            'trl': mock.MagicMock(),
+            'verl': mock.MagicMock(),
             'omegaconf': mock.MagicMock(),
         }):
             try:
@@ -178,7 +178,7 @@ class TestTRLIntegration:
             }
         ]
         
-        # Expected TRL format
+        # Expected VERL format
         expected_fields = ["input_ids", "attention_mask", "query", "reference", "article", "id"]
         
         # This test validates the conversion logic structure
@@ -204,20 +204,20 @@ class TestTRLIntegration:
 
 
 def run_tests():
-    """Run all TRL integration tests."""
-    print("Running TRL integration tests...")
+    """Run all VERL integration tests."""
+    print("Running VERL integration tests...")
     
-    test_suite = TestTRLIntegration()
+    test_suite = TestVERLIntegration()
     
     results = []
-    results.append(test_suite.test_convert_to_ppo_format())
+    results.append(test_suite.test_convert_to_verl_format())
     results.append(test_suite.test_extract_article_from_prompt())
     results.append(test_suite.test_data_format_compatibility())
     
     passed = sum(results)
     total = len(results)
     
-    print(f"\n✨ TRL integration tests completed: {passed}/{total} passed")
+    print(f"\n✨ VERL integration tests completed: {passed}/{total} passed")
     return passed == total
 
 
