@@ -13,7 +13,7 @@ torch_dtype: "auto"
 
 # Tokenizer configuration
 tokenizer:
-  padding_side: "right"  # Use right padding for smaller/standard models
+  padding_side: "left"
   trust_remote_code: true
 
 # Generation settings

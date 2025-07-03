@@ -133,10 +133,10 @@ class PPOTrainingLoop:
         initial_dataset = self._create_minimal_dataset()
         
         self.ppo_trainer = PPOTrainer(
-            config=ppo_config,
+            args=ppo_config,
             processing_class=self.tokenizer,
-            policy=self.model,
-            ref_policy=ref_model,
+            model=self.model,
+            ref_model=ref_model,
             reward_model=reward_model,
             train_dataset=initial_dataset,
             value_model=self.model,
