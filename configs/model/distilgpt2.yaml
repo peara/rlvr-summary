@@ -1,0 +1,24 @@
+# DistilGPT2 model configuration for memory-constrained training
+# Using DistilGPT2 (~82M parameters) to avoid OOM issues
+
+_target_: transformers.AutoModelForCausalLM.from_pretrained
+
+model_name: "distilgpt2"  # ~82M parameters - much smaller!
+trust_remote_code: true
+
+# Quantization settings for even more memory savings
+load_in_8bit: false
+load_in_4bit: false
+torch_dtype: "auto"
+
+# Generation settings
+generation:
+  max_new_tokens: 128  # Reduced for smaller model
+  temperature: 0.7
+  top_p: 0.9
+  do_sample: true
+  pad_token_id: null  # Will be set from tokenizer
+
+# Model-specific settings
+use_cache: true
+device_map: "auto"
