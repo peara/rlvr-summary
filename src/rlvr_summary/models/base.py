@@ -93,15 +93,22 @@ class ModelLoader:
         
         self.logger.info(f"Loading model: {model_name}")
         
-        # Load tokenizer
+        # Load tokenizer with configuration
+        tokenizer_config = self.get_tokenizer_config()
         tokenizer = AutoTokenizer.from_pretrained(
             model_name,
-            trust_remote_code=self.config.get("trust_remote_code", True),
+            trust_remote_code=tokenizer_config.get("trust_remote_code", True),
         )
         
         # Set pad token if not exists
         if tokenizer.pad_token is None:
             tokenizer.pad_token = tokenizer.eos_token
+        
+        # Configure padding side if specified
+        padding_side = tokenizer_config.get("padding_side")
+        if padding_side and padding_side in ["left", "right"]:
+            tokenizer.padding_side = padding_side
+            self.logger.info(f"Set tokenizer padding side to: {padding_side}")
         
         # Prepare model loading arguments
         model_kwargs = {
@@ -152,6 +159,27 @@ class ModelLoader:
         else:
             self.logger.warning(f"Unknown dtype {dtype_str}, using auto")
             return torch.float16 if torch.cuda.is_available() else torch.float32
+    
+    def get_tokenizer_config(self) -> Dict[str, Any]:
+        """Get tokenizer configuration.
+        
+        Returns:
+            Tokenizer configuration dictionary
+        """
+        tokenizer_config = self.config.get("tokenizer", {})
+        
+        # Set defaults
+        defaults = {
+            "padding_side": "right",  # "left", "right", or None for no change
+            "trust_remote_code": True,
+        }
+        
+        # Merge with config, keeping existing config values
+        for key, default_value in defaults.items():
+            if key not in tokenizer_config:
+                tokenizer_config[key] = default_value
+        
+        return tokenizer_config
     
     def get_generation_config(self) -> Dict[str, Any]:
         """Get generation configuration.
