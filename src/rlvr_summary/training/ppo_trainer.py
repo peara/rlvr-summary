@@ -127,20 +127,18 @@ class PPOTrainingLoop:
             reward_model = reward_model.cuda()
             torch.cuda.empty_cache()  # Clear cache after loading models
 
-        # Create dummy dataset for PPOTrainer initialization
-        # Note: TRL PPOTrainer expects a specific dataset format and handles
-        # the complete training loop internally. Our approach tries to use
-        # TRL's training first, then falls back to a simplified custom loop.
-        dummy_data = self.create_dummy_dataset(10)
-        dummy_dataset = self._convert_to_ppo_format(dummy_data)
-
+        # Create minimal initial dataset for PPOTrainer initialization
+        # We'll load the full dataset later in the train method
+        self.logger.info("Creating minimal initial dataset for PPOTrainer...")
+        initial_dataset = self._create_minimal_dataset()
+        
         self.ppo_trainer = PPOTrainer(
             config=ppo_config,
             processing_class=self.tokenizer,
             policy=self.model,
             ref_policy=ref_model,
             reward_model=reward_model,
-            train_dataset=dummy_dataset,
+            train_dataset=initial_dataset,
             value_model=self.model,
         )
 
@@ -153,24 +151,28 @@ class PPOTrainingLoop:
 
         self.logger.info("PPO training loop setup complete!")
 
-    def create_dummy_dataset(self, size: int) -> List[Dict[str, str]]:
-        """Create a dummy dataset for testing purposes.
-
-        Args:
-            size: Number of examples to create
-
+    def _create_minimal_dataset(self) -> Dataset:
+        """Create a minimal dataset for PPOTrainer initialization.
+        
+        This creates a small sample dataset to satisfy TRL's initialization requirements.
+        The actual training dataset will be loaded and set later in the train method.
+        
         Returns:
-            List of dictionaries with 'article', 'summary', and 'id' keys
+            Minimal Dataset object with tokenized prompts for TRL PPOTrainer
         """
-        dummy_data = []
-        for i in range(size):
-            example = {
-                "id": f"dummy_{i}",
-                "article": f"This is a dummy article number {i}. It contains some sample text that can be used for testing the summarization pipeline. The article discusses various topics and provides enough content to generate meaningful summaries.",
-                "summary": f"This is a dummy summary for article {i}. It provides a brief overview of the main points.",
-            }
-            dummy_data.append(example)
-        return dummy_data
+        if not self.tokenizer:
+            raise ValueError("Tokenizer must be initialized before creating minimal dataset")
+            
+        # Create one minimal sample
+        minimal_data = [{
+            "id": "init_sample",
+            "article": "This is a minimal initialization sample for the PPOTrainer setup.",
+            "summary": "Minimal sample for initialization.",
+        }]
+        
+        return self._convert_to_ppo_format(minimal_data)
+
+
 
     def _convert_to_ppo_format(self, data: List[Dict[str, str]]) -> Dataset:
         """Convert processed data to TRL PPOTrainer expected format.
@@ -627,106 +629,15 @@ class PPOTrainingLoop:
         self.ppo_trainer.args.save_steps = self.config.get("save_steps", 1000)
         self.ppo_trainer.args.eval_steps = self.config.get("eval_steps", 500)
 
-        try:
-            # Use TRL's built-in training loop
-            self.logger.info("Starting TRL PPO training...")
-            self.ppo_trainer.train()
-
-        except Exception as e:
-            self.logger.error(f"Error during TRL training: {e}")
-            self.logger.info("Falling back to custom training loop...")
-
-            # Convert Dataset back to list format for custom training loop
-            train_list = [
-                {
-                    "id": sample["id"],
-                    "article": sample["article"],
-                    "summary": sample["reference"],
-                }
-                for sample in train_dataset
-            ]
-            eval_list = [
-                {
-                    "id": sample["id"],
-                    "article": sample["article"],
-                    "summary": sample["reference"],
-                }
-                for sample in eval_dataset
-            ]
-
-            # Fallback to simple custom training loop
-            self._custom_training_loop(train_list, eval_list)
+        # Use TRL's built-in training loop
+        self.logger.info("Starting TRL PPO training...")
+        self.ppo_trainer.train()
 
         # Final checkpoint
         self.save_checkpoint()
         self.logger.info("Training completed!")
 
-    def _custom_training_loop(
-        self, train_dataset: List[Dict], eval_dataset: List[Dict]
-    ):
-        """Fallback custom training loop for demonstration purposes."""
-        self.logger.info("Running custom training loop (simplified PPO)...")
 
-        # Training configuration
-        batch_size = self.config.get("batch_size", 16)
-        logging_steps = self.config.get("logging_steps", 10)
-        save_steps = self.config.get("save_steps", 1000)
-        eval_steps = self.config.get("eval_steps", 500)
-
-        start_time = time.time()
-
-        while self.step < self.total_steps:
-            # Sample batch
-            batch_start = (self.step * batch_size) % len(train_dataset)
-            batch_end = min(batch_start + batch_size, len(train_dataset))
-            batch_examples = train_dataset[batch_start:batch_end]
-
-            if len(batch_examples) < batch_size:
-                # Wrap around dataset
-                remaining = batch_size - len(batch_examples)
-                batch_examples.extend(train_dataset[:remaining])
-
-            # Prepare batch
-            batch = self.prepare_batch(batch_examples)
-
-            # Training step
-            try:
-                metrics = self.train_step(batch)
-
-                # Log metrics
-                if self.step % logging_steps == 0:
-                    elapsed = time.time() - start_time
-                    metrics["train/elapsed_time"] = elapsed
-                    metrics["train/steps_per_second"] = (
-                        self.step / elapsed if elapsed > 0 else 0.0
-                    )
-
-                    if self.wandb_logger and hasattr(self.wandb_logger, "log"):
-                        self.wandb_logger.log(metrics, step=self.step)
-
-                    self.logger.info(f"Step {self.step}: {metrics}")
-
-                # Save checkpoint
-                if self.step % save_steps == 0 and self.step > 0:
-                    self.save_checkpoint(metrics)
-
-                # Run evaluation
-                if self.step % eval_steps == 0 and self.step > 0:
-                    eval_metrics = self.evaluate(eval_dataset)
-
-                    # Check for milestone
-                    rouge1_f1 = eval_metrics.get("eval/rouge1_f1", 0.0)
-                    if rouge1_f1 >= 0.2:  # 20% milestone
-                        self.logger.info(
-                            f"🎉 Milestone achieved! ROUGE-1 F1: {rouge1_f1:.3f}"
-                        )
-
-                self.step += 1
-
-            except Exception as e:
-                self.logger.error(f"Error in training step {self.step}: {e}")
-                self.step += 1
-                continue
 
 
 def train_ppo_model(
