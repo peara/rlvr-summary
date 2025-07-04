@@ -5,10 +5,11 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 try:
     import torch
+    from omegaconf import DictConfig, OmegaConf
     from transformers import AutoTokenizer
     from verl.single_controller.ray import RayWorkerGroup
 
@@ -40,19 +41,24 @@ class VERLPPOTrainingLoop:
 
     def __init__(
         self,
-        config: Dict[str, Any],
+        config: Union[Dict[str, Any], DictConfig],
         wandb_logger=None,
     ):
         """Initialize VERL Ray PPO training loop.
 
         Args:
-            config: Training configuration
+            config: Training configuration (dict or DictConfig)
             wandb_logger: W&B logger for experiment tracking
         """
         if not TORCH_AVAILABLE or not VERL_AVAILABLE:
             raise ImportError(f"PyTorch and VERL are required: {missing_deps}")
 
-        self.config = config
+        # Convert dict to DictConfig if necessary for consistent handling
+        if isinstance(config, dict):
+            self.config = OmegaConf.create(config)
+        else:
+            self.config = config
+
         self.wandb_logger = wandb_logger
         self.logger = logging.getLogger(f"{__class__.__module__}.{__class__.__name__}")
 
@@ -63,7 +69,8 @@ class VERLPPOTrainingLoop:
         self.val_reward_manager = None
 
         # Paths
-        self.checkpoint_dir = Path(config.get("checkpoint_dir", "./checkpoints"))
+        checkpoint_dir = self.config.get("checkpoint_dir", "./checkpoints")
+        self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     def setup_tokenizer(self):
@@ -158,14 +165,14 @@ class VERLPPOTrainingLoop:
         # Set up workers and resources
         role_worker_mapping, resource_pool_manager = self.setup_workers_and_resources()
 
-        # Ensure config is in proper VERL format
-        verl_config = self._ensure_verl_config_format(self.config)
+        # Update config with model path and reward function
+        self._update_verl_config()
 
         self.logger.info("Initializing VERL RayPPOTrainer...")
 
-        # Create the VERL trainer
+        # Create the VERL trainer - pass config directly as OmegaConf object
         self.trainer = RayPPOTrainer(
-            config=verl_config,
+            config=self.config,
             tokenizer=self.tokenizer,
             role_worker_mapping=role_worker_mapping,
             resource_pool_manager=resource_pool_manager,
@@ -259,10 +266,14 @@ class VERLPPOTrainingLoop:
         )
 
         # Update config with data path for VERL
-        self.config["data"] = {
-            "train_files": [str(parquet_path)],
-            "val_files": [str(parquet_path)],  # Use same for validation for now
-        }
+        OmegaConf.set_struct(self.config, False)  # Allow adding new keys
+        if "data" not in self.config:
+            self.config.data = {}
+        self.config.data.train_files = [str(parquet_path)]
+        self.config.data.val_files = [
+            str(parquet_path)
+        ]  # Use same for validation for now
+        OmegaConf.set_struct(self.config, True)  # Re-enable struct mode
 
     def train(self):
         """Main training loop using VERL RayPPOTrainer."""
@@ -284,100 +295,20 @@ class VERLPPOTrainingLoop:
 
         self.logger.info("VERL PPO training completed!")
 
-    def _ensure_verl_config_format(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Ensure config is in proper format for VERL RayPPOTrainer.
+    def _update_verl_config(self):
+        """Update VERL config with runtime values like model path and reward function."""
+        # Update model path if provided through legacy config
+        model_name = self.config.get("model_name")
+        if model_name and hasattr(self.config, "actor_rollout_ref"):
+            self.config.actor_rollout_ref.model.path = model_name
 
-        Args:
-            config: Input configuration dictionary
+        # Update reward function path
+        reward_file_path = Path(__file__).parent.parent / "rewards" / "verl_reward.py"
+        if hasattr(self.config, "custom_reward_function"):
+            self.config.custom_reward_function.path = str(reward_file_path)
 
-        Returns:
-            Properly formatted VERL configuration
-        """
-        # Default VERL configuration structure
-        verl_config = {
-            # Model configuration
-            "model": {
-                "model_name": config.get("model_name", "distilgpt2"),
-                "trust_remote_code": config.get("trust_remote_code", False),
-            },
-            # Training hyperparameters
-            "trainer": {
-                "total_epochs": config.get("total_epochs", 1),
-                "rollout_batch_size": config.get("rollout_batch_size", 16),
-                "n_gpus_per_node": config.get("n_gpus_per_node", 1),
-                "nnodes": config.get("nnodes", 1),
-            },
-            # PPO algorithm configuration
-            "algorithm": {
-                "kl_ctrl": {
-                    "kl_coef": config.get("kl_coef", 0.1),
-                    "adaptive_kl": config.get("adaptive_kl", False),
-                },
-                "rollout_config": {
-                    "temperature": config.get("temperature", 0.7),
-                    "top_p": config.get("top_p", 0.9),
-                    "max_new_tokens": config.get("max_new_tokens", 256),
-                },
-                "ppo_mini_batch_size": config.get("ppo_mini_batch_size", 4),
-                "ppo_epochs": config.get("ppo_epochs", 4),
-                "clip_range": config.get("clip_range", 0.2),
-                "clip_range_value": config.get("clip_range_value", 0.2),
-            },
-            # Data configuration
-            "data": config.get("data", {}),
-            # Reward model configuration
-            "reward_model": {
-                "enable": config.get("enable_reward_model", False),
-                "model_name": config.get("reward_model_name", ""),
-            },
-            # Actor-Rollout-Reference worker configuration
-            "actor_rollout_ref": {
-                "actor": {
-                    "strategy": config.get("strategy", "fsdp"),
-                    "optim": {
-                        "lr": config.get("learning_rate", 1e-5),
-                        "beta1": config.get("beta1", 0.9),
-                        "beta2": config.get("beta2", 0.95),
-                        "eps": config.get("eps", 1e-5),
-                        "weight_decay": config.get("weight_decay", 0.1),
-                    },
-                },
-                "rollout": {
-                    "log_prob_micro_batch_size": config.get(
-                        "log_prob_micro_batch_size", 4
-                    ),
-                    "tensor_model_parallel_size": config.get(
-                        "tensor_model_parallel_size", 1
-                    ),
-                    "pipeline_model_parallel_size": config.get(
-                        "pipeline_model_parallel_size", 1
-                    ),
-                },
-                "ref": {
-                    "log_prob_micro_batch_size": config.get(
-                        "ref_log_prob_micro_batch_size", 4
-                    ),
-                },
-            },
-            # Critic worker configuration
-            "critic": {
-                "strategy": config.get("strategy", "fsdp"),
-                "optim": {
-                    "lr": config.get("critic_learning_rate", 1e-5),
-                    "beta1": config.get("beta1", 0.9),
-                    "beta2": config.get("beta2", 0.95),
-                    "eps": config.get("eps", 1e-5),
-                    "weight_decay": config.get("weight_decay", 0.1),
-                },
-            },
-        }
+        self.logger.info("Updated VERL config with runtime values")
 
-        # Merge with any additional config provided
-        for key, value in config.items():
-            if key not in verl_config:
-                verl_config[key] = value
-
-        return verl_config
 
 def train_ppo_model(
     config_path: Optional[str] = None,

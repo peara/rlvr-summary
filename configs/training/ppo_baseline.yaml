@@ -1,41 +1,155 @@
-# PPO training configuration for baseline RL-VR (Phase A)
+# VERL PPO training configuration for baseline RL-VR (Phase A)
 
-_target_: trl.PPOConfig
+# Data configuration
+data:
+  tokenizer: null
+  train_files: []  # Will be populated by prepare_data()
+  val_files: []    # Will be populated by prepare_data()
+  prompt_key: prompt
+  max_prompt_length: 256
+  max_response_length: 256
+  train_batch_size: 4
+  return_raw_input_ids: False
+  return_raw_chat: False
+  return_full_prompt: False
+  shuffle: True
+  filter_overlong_prompts: False
+  filter_overlong_prompts_workers: 1
+  truncation: error
+  trust_remote_code: False
 
-# Training parameters
-learning_rate: 1.41e-5
-batch_size: 4  # Reduced from 16
-mini_batch_size: 2  # Reduced from 4
-gradient_accumulation_steps: 1
+# Actor/Rollout/Reference Policy configuration
+actor_rollout_ref:
+  hybrid_engine: True
+  model:
+    path: distilgpt2  # Will be overridden by config
+    external_lib: null
+    override_config:
+      model_config: {}
+    enable_gradient_checkpointing: False
+    enable_activation_offload: False
+    trust_remote_code: False
+    use_remove_padding: False
 
-# PPO-specific parameters
-ppo_epochs: 4
-clip_range: 0.2
-clip_range_vf: null
-vf_coef: 0.1
-ent_coef: 0.01
-target_kl: 0.1
+  actor:
+    strategy: fsdp
+    ppo_mini_batch_size: 4
+    ppo_micro_batch_size: null  # Deprecated, will use ppo_micro_batch_size_per_gpu
+    ppo_micro_batch_size_per_gpu: 2
+    use_dynamic_bsz: False
+    ppo_max_token_len_per_gpu: 512  # max_prompt_length + max_response_length
+    grad_clip: 1.0
+    clip_ratio: 0.2
+    entropy_coeff: 0.01
+    use_kl_loss: False
+    use_torch_compile: False
+    ppo_epochs: 4
+    data_loader_seed: null
+    shuffle: False
+    ulysses_sequence_parallel_size: 1
+    optim:
+      lr: 1.41e-5
+      lr_warmup_steps: 100
+      lr_warmup_steps_ratio: 0.01
+      min_lr_ratio: 0.0
+      num_cycles: 0.5
+      warmup_style: constant
+      total_training_steps: 10000
+    fsdp_config:
+      wrap_policy:
+        min_num_params: 0
+      param_offload: False
+      optimizer_offload: False
+      fsdp_size: -1
+    checkpoint:
+      save_contents: ['model', 'optimizer', 'extra']
+      load_contents: ['model', 'optimizer', 'extra']
 
-# Training schedule
-max_steps: 10000
-warmup_steps: 100
-logging_steps: 10
-save_steps: 1000
-eval_steps: 500
+  ref:
+    fsdp_config:
+      param_offload: False
+      wrap_policy:
+        min_num_params: 0
+    log_prob_micro_batch_size: null  # Deprecated, will use log_prob_micro_batch_size_per_gpu
+    log_prob_micro_batch_size_per_gpu: 4
+    log_prob_use_dynamic_bsz: False
+    log_prob_max_token_len_per_gpu: 512
+    ulysses_sequence_parallel_size: 1
 
-# Model parameters
-max_length: 512  # Reduced from 1024
-max_prompt_length: 256  # Reduced from 512
+  rollout:
+    name: hf  # Use HuggingFace for simpler setup
+    temperature: 0.7
+    top_k: 0
+    top_p: 0.9
+    prompt_length: 256
+    response_length: 256
+    dtype: float32
+    ignore_eos: False
+    do_sample: True
+    n: 1
+    log_prob_micro_batch_size: null  # Deprecated, will use log_prob_micro_batch_size_per_gpu
+    log_prob_micro_batch_size_per_gpu: 4
+    log_prob_use_dynamic_bsz: False
+    log_prob_max_token_len_per_gpu: 512
+    val_kwargs:
+      top_k: 0
+      top_p: 1.0
+      temperature: 0
+      n: 1
+      do_sample: False
 
-# Optimization
-optimizer: "adamw"
-weight_decay: 0.01
-max_grad_norm: 1.0
+# Critic model configuration
+critic:
+  strategy: fsdp
+  use_dynamic_bsz: False
+  ppo_micro_batch_size: null  # Deprecated, will use ppo_micro_batch_size_per_gpu
+  ppo_micro_batch_size_per_gpu: 2
+  optim:
+    lr: 1.41e-5
+    beta1: 0.9
+    beta2: 0.95
+    eps: 1e-5
+    weight_decay: 0.01
 
-# Scheduler
-lr_scheduler_type: "cosine"
-num_train_epochs: 1
+# Reward model configuration (disabled for rule-based rewards)
+reward_model:
+  enable: False
 
-# Early stopping
-early_stopping: true
-early_stopping_patience: 3
+# Custom reward function configuration
+custom_reward_function:
+  path: null  # Will be set by trainer
+  name: compute_score
+
+# Algorithm configuration
+algorithm:
+  gamma: 1.0
+  lam: 1.0
+  adv_estimator: gae
+  use_kl_in_reward: False
+  kl_penalty: kl
+  kl_ctrl:
+    type: fixed
+    kl_coef: 0.1
+    horizon: 10000
+    target_kl: 0.1
+
+# Trainer configuration
+trainer:
+  total_epochs: 1
+  project_name: rlvr_summary
+  experiment_name: ppo_baseline
+  logger: ['console', 'wandb']
+  log_val_generations: 0
+  nnodes: 1
+  n_gpus_per_node: 1
+  save_freq: 1000
+  val_before_train: False
+  test_freq: 500
+  critic_warmup: 0
+  default_hdfs_dir: ./checkpoints
+  default_local_dir: ./checkpoints
+  resume_mode: auto
+  resume_from_path: null
+  remove_previous_ckpt_in_save: False
+  del_local_ckpt_after_load: False
+  ray_wait_register_center_timeout: 300
