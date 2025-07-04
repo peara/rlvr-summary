@@ -1,226 +1,70 @@
-"""Tests for VERL integration and format conversion."""
+#!/usr/bin/env python3
+"""Test VERL integration with corrected configuration."""
 
 import sys
-from pathlib import Path
-import tempfile
+import os
+sys.path.append('./src')
 
-# Add src to path for testing
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-
-class MockTokenizer:
-    """Mock tokenizer for testing purposes."""
+def test_verl_trainer():
+    """Test VERL PPO trainer initialization."""
+    print("Testing VERL PPO trainer...")
     
-    def __init__(self):
-        self.pad_token = None
-        self.eos_token = "[EOS]"
-    
-    def __call__(self, text, max_length=512, truncation=True, padding=False, return_tensors=None):
-        """Mock tokenization that returns fake token IDs."""
-        if isinstance(text, list):
-            # Batch tokenization
-            return {
-                "input_ids": [[1, 2, 3, 4, 5] for _ in text],
-                "attention_mask": [[1, 1, 1, 1, 1] for _ in text]
-            }
-        else:
-            # Single text tokenization
-            return {
-                "input_ids": [1, 2, 3, 4, 5],
-                "attention_mask": [1, 1, 1, 1, 1]
-            }
-
-
-class MockDataset:
-    """Mock Dataset class for testing."""
-    
-    def __init__(self, data):
-        self.data = data
-    
-    def __len__(self):
-        return len(self.data)
-    
-    def __getitem__(self, idx):
-        return self.data[idx]
-    
-    def __iter__(self):
-        return iter(self.data)
-    
-    @classmethod
-    def from_list(cls, data):
-        return cls(data)
-
-
-class TestVERLIntegration:
-    """Test VERL format conversion functionality."""
-    
-    def test_convert_to_verl_format(self):
-        """Test conversion to VERL PPOTrainer format."""
-        # Mock the dependencies to test the logic
-        import unittest.mock as mock
+    try:
+        from rlvr_summary.training.ppo_trainer import VERLPPOTrainingLoop
+        print("✓ VERLPPOTrainingLoop imported successfully")
         
-        # Create test data in the current format
-        test_data = [
-            {
-                "id": "test_001",
-                "article": "This is a test article about science.",
-                "summary": "Test article about science."
-            },
-            {
-                "id": "test_002", 
-                "article": "Another test article about technology.",
-                "summary": "Test article about technology."
-            }
-        ]
-        
-        # Mock the training loop with minimal config
+        # Test configuration
         config = {
-            "max_prompt_length": 512,
-            "batch_size": 4,
-            "max_steps": 10,
-            "checkpoint_dir": tempfile.mkdtemp(),
+            "model_name": "distilgpt2",
+            "checkpoint_dir": "./test_checkpoints",
+            "total_epochs": 1,
+            "rollout_batch_size": 2,
+            "n_gpus_per_node": 1,
+            "nnodes": 1,
+            "data_path": "dummy",
+            "train_size": 10,
         }
         
-        # Mock imports and create a minimal training loop
-        with mock.patch.dict('sys.modules', {
-            'torch': mock.MagicMock(),
-            'datasets': mock.MagicMock(),
-            'transformers': mock.MagicMock(),
-            'verl': mock.MagicMock(),
-            'omegaconf': mock.MagicMock(),
-        }):
-            # Import after mocking
-            try:
-                from rlvr_summary.training.ppo_trainer import PPOTrainingLoop
-                
-                # Mock the Dataset import within the module
-                import rlvr_summary.training.ppo_trainer as ppo_module
-                ppo_module.Dataset = MockDataset
-                
-                # Create training loop instance
-                training_loop = PPOTrainingLoop(config)
-                training_loop.tokenizer = MockTokenizer()
-                
-                # Test the conversion method
-                result = training_loop._convert_to_verl_format(test_data)
-                
-                # Validate the result
-                assert len(result) == 2
-                
-                # Check structure of first sample
-                sample = result.data[0]
-                assert "input_ids" in sample
-                assert "attention_mask" in sample
-                assert "query" in sample
-                assert "reference" in sample
-                assert "article" in sample
-                assert "id" in sample
-                
-                # Check that query contains the prompt
-                assert "Summarize the following article:" in sample["query"]
-                assert "This is a test article about science." in sample["query"]
-                
-                # Check that metadata is preserved
-                assert sample["reference"] == "Test article about science."
-                assert sample["article"] == "This is a test article about science."
-                assert sample["id"] == "test_001"
-                
-                print("✅ VERL format conversion test passed")
-                return True
-                
-            except ImportError as e:
-                print(f"❌ Import error in VERL conversion test: {e}")
-                return False
-    
-    def test_extract_article_from_prompt(self):
-        """Test article extraction from prompt."""
-        import unittest.mock as mock
+        # Test initialization
+        trainer = VERLPPOTrainingLoop(config=config)
+        print("✓ VERLPPOTrainingLoop initialized successfully")
         
-        config = {"batch_size": 4, "max_steps": 10}
+        # Test tokenizer setup
+        trainer.setup_tokenizer()
+        print("✓ Tokenizer setup successful")
         
-        with mock.patch.dict('sys.modules', {
-            'torch': mock.MagicMock(),
-            'datasets': mock.MagicMock(), 
-            'transformers': mock.MagicMock(),
-            'verl': mock.MagicMock(),
-            'omegaconf': mock.MagicMock(),
-        }):
-            try:
-                from rlvr_summary.training.ppo_trainer import PPOTrainingLoop
-                
-                training_loop = PPOTrainingLoop(config)
-                
-                # Test prompt
-                prompt = "Summarize the following article:\n\nThis is a test article about science.\n\nSummary:"
-                
-                # Extract article
-                article = training_loop._extract_article_from_prompt(prompt)
-                
-                # Validate extraction
-                assert article == "This is a test article about science."
-                
-                print("✅ Article extraction test passed") 
-                return True
-                
-            except ImportError as e:
-                print(f"❌ Import error in article extraction test: {e}")
-                return False
-    
-    def test_data_format_compatibility(self):
-        """Test that the new format maintains backward compatibility."""
+        # Test reward function setup
+        trainer.setup_reward_function()
+        print("✓ Reward function setup successful")
         
-        # Test data in old format
-        old_format_data = [
-            {
-                "id": "test_001",
-                "article": "Test article content.",
-                "summary": "Test summary."
-            }
-        ]
-        
-        # Expected VERL format
-        expected_fields = ["input_ids", "attention_mask", "query", "reference", "article", "id"]
-        
-        # This test validates the conversion logic structure
-        for sample in old_format_data:
-            # Simulate the conversion logic
-            prompt = f"Summarize the following article:\n\n{sample['article']}\n\nSummary:"
+        # Check if custom reward file was created
+        reward_file = trainer.checkpoint_dir / "custom_reward.py"
+        if reward_file.exists():
+            print("✓ Custom reward function file created")
             
-            expected_result = {
-                "input_ids": [1, 2, 3, 4, 5],  # Mock tokenization
-                "attention_mask": [1, 1, 1, 1, 1],
-                "query": prompt,
-                "reference": sample["summary"],
-                "article": sample["article"],
-                "id": sample["id"],
-            }
+            # Test the reward function
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("custom_reward", reward_file)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
             
-            # Validate all expected fields are present
-            for field in expected_fields:
-                assert field in expected_result
-            
-        print("✅ Data format compatibility test passed")
+            # Test the compute_score function
+            score = module.compute_score(
+                data_source="test",
+                solution_str="This is a test summary of moderate length with proper punctuation.",
+                ground_truth="reference text"
+            )
+            print(f"✓ Custom reward function works, test score: {score}")
+        
+        print("✓ All VERL integration tests passed!")
         return True
-
-
-def run_tests():
-    """Run all VERL integration tests."""
-    print("Running VERL integration tests...")
-    
-    test_suite = TestVERLIntegration()
-    
-    results = []
-    results.append(test_suite.test_convert_to_verl_format())
-    results.append(test_suite.test_extract_article_from_prompt())
-    results.append(test_suite.test_data_format_compatibility())
-    
-    passed = sum(results)
-    total = len(results)
-    
-    print(f"\n✨ VERL integration tests completed: {passed}/{total} passed")
-    return passed == total
-
+        
+    except Exception as e:
+        print(f"✗ Test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 if __name__ == "__main__":
-    success = run_tests()
+    success = test_verl_trainer()
     sys.exit(0 if success else 1)

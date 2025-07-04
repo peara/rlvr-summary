@@ -2,3 +2,8 @@
 applyTo: '**'
 ---
 When there are uncertainty, unreasonable or not optimal points in an issue, should ask for clarification by commenting to the issue.
+We are doing a research project, so:
+- things must work, or just fail. We don't need things run but not correct.
+- backward-compatible is not necessary.
+- no need for demo, better update README and tests.
+- we are working with cutting-edge tools and libs. if you don't know the docs, ask immediately. DO NOT GUESS.
