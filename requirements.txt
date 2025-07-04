@@ -6,7 +6,7 @@ torch>=2.3.0
 transformers>=4.42.0
 
 # RL Framework  
-trl>=0.7.0
+verl>=0.4.0
 
 # Fast inference and optimization
 vllm>=0.2.0

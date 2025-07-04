@@ -214,9 +214,9 @@ def validate_training_config(config: DictConfig, check_files: bool = True) -> Di
         results["missing_dependencies"].append("transformers")
     
     try:
-        import trl
+        import verl
     except ImportError:
-        results["missing_dependencies"].append("trl")
+        results["missing_dependencies"].append("verl")
     
     if results["missing_dependencies"]:
         results["errors"].append("Missing required dependencies for training")

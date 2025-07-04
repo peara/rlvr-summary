@@ -146,7 +146,7 @@ def check_environment() -> Dict[str, Any]:
         "python_version": sys.version_info,
         "torch_available": False,
         "transformers_available": False,
-        "trl_available": False,
+        "verl_available": False,
         "wandb_available": False,
         "cuda_available": False,
     }
@@ -170,8 +170,8 @@ def check_environment() -> Dict[str, Any]:
         pass
     
     try:
-        import trl
-        env_status["trl_available"] = True
+        import verl
+        env_status["verl_available"] = True
     except ImportError:
         pass
     
@@ -305,8 +305,8 @@ Examples:
         print("❌ Transformers not available. Please install: pip install transformers")
         sys.exit(1)
     
-    if not env_status["trl_available"]:
-        print("❌ TRL not available. Please install: pip install trl")
+    if not env_status["verl_available"]:
+        print("❌ VERL not available. Please install: pip install verl")
         sys.exit(1)
     
     if env_status["cuda_available"]:
@@ -364,7 +364,7 @@ Examples:
         
     except ImportError as e:
         print(f"❌ Missing dependencies for training: {e}")
-        print("Please install required packages: pip install torch transformers trl")
+        print("Please install required packages: pip install torch transformers verl")
         sys.exit(1)
         
     except Exception as e:

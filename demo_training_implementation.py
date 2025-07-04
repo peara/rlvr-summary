@@ -107,13 +107,13 @@ def demo_training_pipeline():
     print("1. ✅ Model Loading (ModelLoader)")
     print("2. ✅ Reward System (Rule-based with length, entity, fluency checks)")
     print("3. ✅ ROUGE Evaluation (SimpleRougeCalculator)")
-    print("4. ✅ PPO Training Loop (requires torch/transformers/trl)")
+    print("4. ✅ PPO Training Loop (requires torch/transformers/verl)")
     print("5. ✅ W&B Integration (WandbLogger)")
     print("6. ✅ Configuration Management (Hydra configs)")
     print("7. ✅ CLI Interface (rlvr-train command)")
     
     print("\nTo run full training:")
-    print("1. Install dependencies: pip install torch transformers trl wandb")
+    print("1. Install dependencies: pip install torch transformers verl wandb")
     print("2. Configure W&B: wandb login")
     print("3. Run training: rlvr-train --experiment my-experiment")
     

@@ -108,9 +108,9 @@ def validate_basic_config(config: Dict[str, Any]) -> Dict[str, Any]:
         results["missing_dependencies"].append("transformers")
     
     try:
-        import trl
+        import verl
     except ImportError:
-        results["missing_dependencies"].append("trl")
+        results["missing_dependencies"].append("verl")
     
     if results["missing_dependencies"]:
         results["warnings"].append("Missing dependencies for full training functionality")
@@ -200,7 +200,7 @@ def check_environment() -> Dict[str, Any]:
         "python_version": sys.version_info,
         "torch_available": False,
         "transformers_available": False,
-        "trl_available": False,
+        "verl_available": False,
         "wandb_available": False,
         "cuda_available": False,
     }
@@ -224,8 +224,8 @@ def check_environment() -> Dict[str, Any]:
         pass
     
     try:
-        import trl
-        env_status["trl_available"] = True
+        import verl
+        env_status["verl_available"] = True
     except ImportError:
         pass
     
@@ -307,7 +307,7 @@ def run_training_command(config: Dict[str, Any], experiment_name: Optional[str] 
             print(f"   • Model: {model_cfg.get('model_name', 'default')}")
         
         print("\n💡 To enable full training, install dependencies:")
-        print("   pip install torch transformers trl")
+        print("   pip install torch transformers verl")
         print("   pip install -e .")
         
     except Exception as e:
