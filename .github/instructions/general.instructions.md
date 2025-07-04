@@ -7,3 +7,9 @@ We are doing a research project, so:
 - backward-compatible is not necessary.
 - no need for demo, better update README and tests.
 - we are working with cutting-edge tools and libs. if you don't know the docs, ask immediately. DO NOT GUESS.
+
+What we are researching:
+- PPO with Functional Reward for Text Summarization with LLM
+- Using VERL as Reinforcement Learning framework
+- Using Rule to calculate format, style, and other scores
+- Using FENICE to calculate factuallity score
