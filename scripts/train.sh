@@ -1,0 +1,29 @@
+set -e
+python3 -m verl.trainer.main_ppo \
+  data.train_files=./data/verl/train_data.parquet \
+  data.val_files=./data/verl/train_data.parquet \
+  data.train_batch_size=4 \
+  data.max_prompt_length=256 \
+  data.max_response_length=256 \
+  actor_rollout_ref.model.path=distilgpt2 \
+  actor_rollout_ref.actor.optim.lr=1e-5 \
+  actor_rollout_ref.actor.ppo_mini_batch_size=4 \
+  actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2 \
+  actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=2 \
+  actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
+  actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
+  actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=2 \
+  critic.optim.lr=1e-5 \
+  critic.model.path=distilgpt2 \
+  critic.ppo_micro_batch_size_per_gpu=2 \
+  algorithm.kl_ctrl.kl_coef=0.001 \
+  trainer.logger=['console'] \
+  trainer.val_before_train=false \
+  trainer.default_hdfs_dir=null \
+  trainer.n_gpus_per_node=1 \
+  trainer.nnodes=1 \
+  trainer.save_freq=10 \
+  trainer.test_freq=5 \
+  trainer.total_epochs=2 \
+  custom_reward_function.path=./src/rlvr_summary/rewards/verl_reward.py \
+  custom_reward_function.name=compute_score
