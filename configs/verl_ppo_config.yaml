@@ -33,7 +33,7 @@ actor_rollout_ref:
   hybrid_engine: true
   
   model:
-    path: distilgpt2
+    path: Qwen2.5-0.5B-Instruct
     custom_chat_template: null
     use_shm: false
     external_lib: null
@@ -204,9 +204,9 @@ critic:
     total_training_steps: -1
     weight_decay: 0.01
   model:
-    path: distilgpt2
+    path: Qwen2.5-0.5B-Instruct
     use_shm: False
-    tokenizer_path: distilgpt2
+    tokenizer_path: Qwen2.5-0.5B-Instruct
     override_config: {}
     external_lib: null
     enable_gradient_checkpointing: True
@@ -252,7 +252,7 @@ reward_model:
   enable: False
   strategy: fsdp
   model:
-    input_tokenizer: distilgpt2
+    input_tokenizer: Qwen2.5-0.5B-Instruct
     path: ~/models/reward-model
     use_shm: False
     external_lib: null

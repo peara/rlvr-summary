@@ -43,17 +43,39 @@ def update_config_with_paths(
     # Update data paths if provided
     if data_summary_path:
         data_summary = OmegaConf.load(data_summary_path)
-        config.data.train_files = data_summary.train_files
-        config.data.val_files = data_summary.val_files
+
+        # Convert relative paths to absolute paths
+        project_root = Path(__file__).parent.parent
+        train_files = []
+        for file_path in data_summary.train_files:
+            abs_path = project_root / file_path
+            train_files.append(str(abs_path))
+
+        val_files = []
+        for file_path in data_summary.val_files:
+            abs_path = project_root / file_path
+            val_files.append(str(abs_path))
+
+        config.data.train_files = train_files
+        config.data.val_files = val_files
         logger.info(f"✅ Loaded data paths from {data_summary_path}")
         logger.info(f"  📊 Train files: {config.data.train_files}")
         logger.info(f"  📊 Val files: {config.data.val_files}")
     else:
-        # Check if data files are specified directly
-        if not config.data.train_files or not config.data.val_files:
-            logger.warning(
-                "⚠️  No data files specified. Please run prepare_data_verl.py first or specify --data-summary"
-            )
+        # Try to auto-discover data summary file
+        default_data_summary = (
+            Path(__file__).parent.parent / "data/verl/data_summary.yaml"
+        )
+        if default_data_summary.exists():
+            logger.info(f"✅ Auto-discovered data summary: {default_data_summary}")
+            return update_config_with_paths(config, str(default_data_summary))
+        else:
+            # Check if data files are specified directly
+            if not config.data.train_files or not config.data.val_files:
+                logger.error(
+                    "❌ No data files specified. Please run prepare_data_verl.py first or specify --data-summary"
+                )
+                raise ValueError("No data files found. Run data preparation first.")
 
     return config
 
