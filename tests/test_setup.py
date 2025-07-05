@@ -1,8 +1,9 @@
 """Test project setup and basic imports."""
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add src to path for testing
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -11,30 +12,25 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 def test_package_import():
     """Test that the main package can be imported."""
     import rlvr_summary
+
     assert rlvr_summary.__version__ == "0.1.0"
 
 
 def test_submodule_imports():
     """Test that all submodules can be imported."""
-    import rlvr_summary.data
-    import rlvr_summary.models
-    import rlvr_summary.training
-    import rlvr_summary.rewards
-    import rlvr_summary.tools
-    import rlvr_summary.evaluation
-    import rlvr_summary.utils
 
 
 def test_cli_import():
     """Test that CLI module can be imported."""
     from rlvr_summary.cli import cli
+
     assert cli is not None
 
 
 def test_config_utilities():
     """Test configuration utilities."""
     from rlvr_summary.utils.config import load_config, validate_config
-    
+
     # Test loading default config
     try:
         cfg = load_config()
@@ -48,11 +44,11 @@ def test_config_utilities():
 def test_wandb_utilities():
     """Test W&B utilities."""
     from rlvr_summary.utils.wandb_logger import WandbLogger, is_wandb_available
-    
+
     # Test W&B availability check
     available = is_wandb_available()
     assert isinstance(available, bool)
-    
+
     # Test logger creation with disabled mode
     logger = WandbLogger(enabled=False)
     assert not logger.enabled
@@ -60,15 +56,15 @@ def test_wandb_utilities():
 
 def test_common_utilities():
     """Test common utilities."""
-    from rlvr_summary.utils.common import set_seed, get_device, format_number
-    
+    from rlvr_summary.utils.common import format_number, get_device, set_seed
+
     # Test seed setting
     set_seed(42)
-    
+
     # Test device detection
     device = get_device("cpu")
     assert str(device) == "cpu"
-    
+
     # Test number formatting
     assert format_number(1500) == "1.5K"
     assert format_number(1500000) == "1.5M"

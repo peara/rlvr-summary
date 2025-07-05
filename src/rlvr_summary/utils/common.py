@@ -1,15 +1,16 @@
 """General utilities for RLVR Summary."""
 
+import logging
 import random
+from typing import Optional
+
 import numpy as np
 import torch
-import logging
-from typing import Optional
 
 
 def set_seed(seed: int) -> None:
     """Set random seed for reproducibility.
-    
+
     Args:
         seed: Random seed value
     """
@@ -25,10 +26,10 @@ def set_seed(seed: int) -> None:
 
 def get_device(device: str = "auto") -> torch.device:
     """Get appropriate device for training/inference.
-    
+
     Args:
         device: Device specification ("auto", "cpu", "cuda", "mps")
-        
+
     Returns:
         PyTorch device
     """
@@ -39,7 +40,7 @@ def get_device(device: str = "auto") -> torch.device:
             device = "mps"
         else:
             device = "cpu"
-    
+
     torch_device = torch.device(device)
     logging.info(f"Using device: {torch_device}")
     return torch_device
@@ -47,10 +48,10 @@ def get_device(device: str = "auto") -> torch.device:
 
 def count_parameters(model: torch.nn.Module) -> int:
     """Count trainable parameters in a model.
-    
+
     Args:
         model: PyTorch model
-        
+
     Returns:
         Number of trainable parameters
     """
@@ -59,10 +60,10 @@ def count_parameters(model: torch.nn.Module) -> int:
 
 def format_number(num: int) -> str:
     """Format large numbers with appropriate suffixes.
-    
+
     Args:
         num: Number to format
-        
+
     Returns:
         Formatted string (e.g., "1.2M", "5.4B")
     """
@@ -82,7 +83,7 @@ def setup_logging(
     log_file: Optional[str] = None,
 ) -> None:
     """Set up logging configuration.
-    
+
     Args:
         level: Logging level
         format_string: Custom format string
@@ -90,17 +91,17 @@ def setup_logging(
     """
     if format_string is None:
         format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    
+
     handlers = [logging.StreamHandler()]
     if log_file:
         handlers.append(logging.FileHandler(log_file))
-    
+
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format=format_string,
         handlers=handlers,
     )
-    
+
     # Set specific loggers to WARNING to reduce noise
     logging.getLogger("transformers").setLevel(logging.WARNING)
     logging.getLogger("torch").setLevel(logging.WARNING)

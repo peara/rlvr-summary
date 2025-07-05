@@ -1,6 +1,6 @@
 """Evaluation metrics and utilities."""
 
-from .rouge import SimpleRougeCalculator, EvaluationPipeline
+from .rouge import EvaluationPipeline, SimpleRougeCalculator
 
 __all__ = [
     "SimpleRougeCalculator",

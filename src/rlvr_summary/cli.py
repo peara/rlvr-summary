@@ -1,7 +1,8 @@
 """Command-line interface for RLVR Summary."""
 
-import click
 import logging
+
+import click
 
 
 @click.group()
@@ -26,21 +27,21 @@ def train(config: str, experiment: str):
     """Train the RLVR model."""
     try:
         from .training import train_ppo_model
-        
+
         click.echo("🚀 Starting RLVR model training...")
         if config:
             click.echo(f"Using config: {config}")
         if experiment:
             click.echo(f"Experiment name: {experiment}")
-        
+
         # Run training
         training_loop = train_ppo_model(
             config_path=config,
             experiment_name=experiment,
         )
-        
+
         click.echo("✅ Training completed successfully!")
-        
+
     except ImportError as e:
         click.echo(f"❌ Missing dependencies for training: {e}")
         click.echo("Please install required packages: torch, transformers, verl")

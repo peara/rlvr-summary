@@ -11,7 +11,6 @@ __author__ = "RLVR Summary Team"
 __email__ = "team@rlvr-summary.com"
 
 # Core modules
-from . import data
 
 # Core modules will be imported as they are implemented
 # from .models import *

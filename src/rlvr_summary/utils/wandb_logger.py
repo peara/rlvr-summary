@@ -1,11 +1,12 @@
 """Weights & Biases integration for experiment tracking."""
 
-import os
 import logging
-from typing import Optional, Dict, Any
+import os
+from typing import Any, Dict, Optional
 
 try:
     import wandb
+
     WANDB_AVAILABLE = True
 except ImportError:
     WANDB_AVAILABLE = False
@@ -14,7 +15,7 @@ except ImportError:
 
 class WandbLogger:
     """Weights & Biases logger for RLVR Summary experiments."""
-    
+
     def __init__(
         self,
         project: str = "rlvr-summary",
@@ -26,7 +27,7 @@ class WandbLogger:
         enabled: bool = True,
     ):
         """Initialize W&B logger.
-        
+
         Args:
             project: W&B project name
             entity: W&B entity (username or team)
@@ -38,14 +39,14 @@ class WandbLogger:
         """
         self.enabled = enabled and WANDB_AVAILABLE
         self.run = None
-        
+
         if not self.enabled:
             if not WANDB_AVAILABLE:
                 logging.warning("W&B not available. Logging disabled.")
             else:
                 logging.info("W&B logging disabled.")
             return
-            
+
         # Initialize W&B run
         self.run = wandb.init(
             project=project,
@@ -56,32 +57,32 @@ class WandbLogger:
             notes=notes,
             resume="allow",
         )
-        
+
         logging.info(f"W&B run initialized: {self.run.url}")
-    
+
     def log(self, metrics: Dict[str, Any], step: Optional[int] = None) -> None:
         """Log metrics to W&B.
-        
+
         Args:
             metrics: Dictionary of metrics to log
             step: Optional step number
         """
         if not self.enabled or self.run is None:
             return
-            
+
         wandb.log(metrics, step=step)
-    
+
     def log_config(self, config: Dict[str, Any]) -> None:
         """Log configuration to W&B.
-        
+
         Args:
             config: Configuration dictionary
         """
         if not self.enabled or self.run is None:
             return
-            
+
         wandb.config.update(config)
-    
+
     def log_artifact(
         self,
         artifact_path: str,
@@ -90,7 +91,7 @@ class WandbLogger:
         description: str = "",
     ) -> None:
         """Log an artifact to W&B.
-        
+
         Args:
             artifact_path: Path to the artifact
             artifact_name: Name of the artifact
@@ -99,7 +100,7 @@ class WandbLogger:
         """
         if not self.enabled or self.run is None:
             return
-            
+
         artifact = wandb.Artifact(
             name=artifact_name,
             type=artifact_type,
@@ -107,22 +108,22 @@ class WandbLogger:
         )
         artifact.add_file(artifact_path)
         wandb.log_artifact(artifact)
-    
+
     def finish(self) -> None:
         """Finish the W&B run."""
         if not self.enabled or self.run is None:
             return
-            
+
         wandb.finish()
         logging.info("W&B run finished.")
 
 
 def setup_wandb_from_config(wandb_config: Dict[str, Any]) -> WandbLogger:
     """Setup W&B logger from configuration.
-    
+
     Args:
         wandb_config: W&B configuration dictionary
-        
+
     Returns:
         Configured WandbLogger instance
     """
@@ -141,7 +142,7 @@ def is_wandb_available() -> bool:
     """Check if W&B is available and properly configured."""
     if not WANDB_AVAILABLE:
         return False
-        
+
     # Check if API key is configured
     api_key = os.getenv("WANDB_API_KEY") or wandb.api.api_key
     return api_key is not None
@@ -149,13 +150,13 @@ def is_wandb_available() -> bool:
 
 def test_wandb_connection() -> bool:
     """Test W&B connection without starting a run.
-    
+
     Returns:
         True if connection is successful, False otherwise
     """
     if not is_wandb_available():
         return False
-        
+
     try:
         # Test connection by checking API
         api = wandb.Api()
