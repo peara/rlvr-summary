@@ -1,9 +1,13 @@
-"""Data loaders for CNN-DailyMail and other datasets."""
+"""Data loaders for CNN-DailyMail dataset.
+
+This module provides the CNNDMLoader for loading the CNN-DailyMail dataset
+in the format expected by VERL training.
+"""
 
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Union
+from typing import Dict, Iterator, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -154,65 +158,3 @@ class CNNDMLoader:
             info["num_samples"] = len(self._dataset)
             
         return info
-
-
-class CustomDataLoader:
-    """Generic data loader for custom dataset formats."""
-    
-    def __init__(self, data_path: Union[str, Path]):
-        """Initialize custom data loader.
-        
-        Args:
-            data_path: Path to data file or directory
-        """
-        self.data_path = Path(data_path)
-        
-    def load_jsonl(self, max_samples: Optional[int] = None) -> Iterator[Dict]:
-        """Load data from JSONL format.
-        
-        Args:
-            max_samples: Maximum number of samples to load
-            
-        Returns:
-            Iterator over data samples
-        """
-        if not self.data_path.exists():
-            raise FileNotFoundError(f"Data file not found: {self.data_path}")
-            
-        count = 0
-        with open(self.data_path, 'r', encoding='utf-8') as f:
-            for line_num, line in enumerate(f, 1):
-                try:
-                    if max_samples and count >= max_samples:
-                        break
-                        
-                    item = json.loads(line.strip())
-                    yield item
-                    count += 1
-                    
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse line {line_num}: {e}")
-                    continue
-                    
-    def load_json(self, max_samples: Optional[int] = None) -> Iterator[Dict]:
-        """Load data from JSON format.
-        
-        Args:
-            max_samples: Maximum number of samples to load
-            
-        Returns:
-            Iterator over data samples
-        """
-        if not self.data_path.exists():
-            raise FileNotFoundError(f"Data file not found: {self.data_path}")
-            
-        with open(self.data_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            
-        if isinstance(data, list):
-            if max_samples:
-                data = data[:max_samples]
-            for item in data:
-                yield item
-        else:
-            yield data

@@ -9,7 +9,7 @@ import os
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from rlvr_summary.data.loaders import CNNDMLoader, CustomDataLoader
+from rlvr_summary.data.loaders import CNNDMLoader
 from rlvr_summary.data.preprocessors import TextPreprocessor
 from rlvr_summary.data.validators import DataValidator
 from rlvr_summary.data.annotations import JSONAnnotationHandler
