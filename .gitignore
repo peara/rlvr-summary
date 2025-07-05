@@ -163,6 +163,7 @@ cython_debug/
 # Data directories
 datasets/
 raw_data/
+*.parquet
 
 # Output directories
 outputs/

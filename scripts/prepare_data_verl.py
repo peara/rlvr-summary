@@ -55,7 +55,6 @@ def prepare_rlvr_dataset(
     )
 
     preprocessor = TextPreprocessor(
-        use_spacy=data_config.get("use_spacy", False),
         max_length=data_config.get("max_article_length", 10000),
     )
 
@@ -104,13 +103,35 @@ def prepare_rlvr_dataset(
     # Save as parquet file for VERL
     output_dir.mkdir(parents=True, exist_ok=True)
     parquet_path = output_dir / f"{split}_data.parquet"
+    json_path = output_dir / f"{split}_data.json"
 
     df = pd.DataFrame(verl_data)
     df.to_parquet(parquet_path, index=False)
 
+    # Also save as JSON for manual inspection
+    import json
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(verl_data, f, indent=2, ensure_ascii=False)
+
     logger.info(
         f"✅ {split.title()} data saved to {parquet_path}: {len(verl_data)} samples"
     )
+    logger.info(
+        f"✅ {split.title()} data also saved to {json_path} for manual inspection"
+    )
+    
+    # Show a preview of the data format
+    if verl_data:
+        logger.info(f"📖 Sample from {split} data:")
+        sample = verl_data[0]
+        print(f"\n{'='*60}")
+        print(f"SAMPLE {split.upper()} DATA")
+        print(f"{'='*60}")
+        print(f"ID: {sample['id']}")
+        print(f"Data Source: {sample['data_source']}")
+        print(f"Prompt (first 200 chars): {sample['prompt'][:200]}...")
+        print(f"Ground Truth (first 100 chars): {sample['ground_truth'][:100]}...")
+        print(f"{'='*60}\n")
 
     return parquet_path
 
