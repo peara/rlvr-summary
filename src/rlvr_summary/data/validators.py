@@ -11,7 +11,6 @@ class ValidationError(Exception):
     """Custom exception for validation errors."""
 
 
-
 class DataValidator:
     """Data validation and quality control for CNN-DM and other datasets.
 
