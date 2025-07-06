@@ -4,6 +4,13 @@ Data preparation script for VERL PPO training.
 
 This script processes the CNN/DailyMail dataset and converts it to the format
 expected by VERL (parquet files with specific schema).
+
+VERL data format requirements (5 required fields):
+1. data_source: Dataset name for reward function indexing
+2. prompt: Chat template format (list of {"role": str, "content": str})
+3. ability: Task category (e.g., "summarization", "math", etc.)
+4. reward_model: {"style": str, "ground_truth": str}
+5. extra_info: Additional metadata dictionary
 """
 
 import argparse
@@ -14,6 +21,7 @@ from typing import Dict
 
 import pandas as pd
 from omegaconf import OmegaConf
+import datasets
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -81,24 +89,46 @@ def prepare_rlvr_dataset(
 
     # Convert to VERL format
     verl_data = []
-    for item in pipeline_result["data"]:
+    for idx, item in enumerate(pipeline_result["data"]):
         processed_item = item.get("processed", item.get("original", {}))
 
-        # Create standardized prompt for VERL
+        # Create standardized prompt for VERL in chat template format
         article = processed_item.get("article", "")
-        prompt = f"Summarize the following article:\n\n{article}\n\nSummary:"
+        prompt_content = f"Summarize the following article:\n\n{article}"
 
         verl_data.append(
             {
-                "prompt": prompt,
                 "data_source": "cnn_dailymail",  # Used by reward function to select scoring method
-                "id": processed_item.get("id", ""),
-                # Include reference for potential reward computation
-                "ground_truth": processed_item.get(
-                    "highlights", processed_item.get("summary", "")
-                ),
+                "prompt": [
+                    {
+                        "role": "user",
+                        "content": prompt_content
+                    }
+                ],
+                "ability": "summarization",  # Task category
+                "reward_model": {
+                    "style": "rule",  # Using rule-based reward
+                    "ground_truth": processed_item.get(
+                        "highlights", processed_item.get("summary", "")
+                    )
+                },
+                "extra_info": {
+                    "split": split,
+                    "index": idx,
+                    "id": processed_item.get("id", ""),
+                }
             }
         )
+
+    # Validate VERL format compliance
+    logger.info("🔍 Validating VERL data format...")
+    for i, sample in enumerate(verl_data[:5]):  # Validate first 5 samples
+        try:
+            validate_verl_format(sample)
+            logger.info(f"✅ Sample {i+1} validation passed")
+        except ValueError as e:
+            logger.error(f"❌ Sample {i+1} validation failed: {e}")
+            raise
 
     # Save as parquet file for VERL
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -110,8 +140,9 @@ def prepare_rlvr_dataset(
 
     # Also save as JSON for manual inspection
     import json
-    with open(json_path, 'w', encoding='utf-8') as f:
-        json.dump(verl_data, f, indent=2, ensure_ascii=False)
+
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(verl_data[:5], f, indent=2, ensure_ascii=False)
 
     logger.info(
         f"✅ {split.title()} data saved to {parquet_path}: {len(verl_data)} samples"
@@ -119,7 +150,7 @@ def prepare_rlvr_dataset(
     logger.info(
         f"✅ {split.title()} data also saved to {json_path} for manual inspection"
     )
-    
+
     # Show a preview of the data format
     if verl_data:
         logger.info(f"📖 Sample from {split} data:")
@@ -127,13 +158,61 @@ def prepare_rlvr_dataset(
         print(f"\n{'='*60}")
         print(f"SAMPLE {split.upper()} DATA")
         print(f"{'='*60}")
-        print(f"ID: {sample['id']}")
         print(f"Data Source: {sample['data_source']}")
-        print(f"Prompt (first 200 chars): {sample['prompt'][:200]}...")
-        print(f"Ground Truth (first 100 chars): {sample['ground_truth'][:100]}...")
+        print(f"Ability: {sample['ability']}")
+        print(f"Prompt: {sample['prompt']}")
+        print(f"Reward Model Style: {sample['reward_model']['style']}")
+        print(f"Ground Truth (first 100 chars): {sample['reward_model']['ground_truth'][:100]}...")
+        print(f"Extra Info: {sample['extra_info']}")
         print(f"{'='*60}\n")
 
     return parquet_path
+
+
+def validate_verl_format(data_sample: Dict) -> bool:
+    """
+    Validate that a data sample follows the VERL format requirements.
+    
+    Args:
+        data_sample: Single data sample to validate
+        
+    Returns:
+        True if valid, raises ValueError if invalid
+    """
+    required_fields = ["data_source", "prompt", "ability", "reward_model", "extra_info"]
+    
+    # Check all required fields exist
+    for field in required_fields:
+        if field not in data_sample:
+            raise ValueError(f"Missing required field: {field}")
+    
+    # Validate prompt format (should be list of chat messages)
+    prompt = data_sample["prompt"]
+    if not isinstance(prompt, list):
+        raise ValueError(f"'prompt' must be a list, got {type(prompt)}")
+    
+    for message in prompt:
+        if not isinstance(message, dict):
+            raise ValueError(f"Prompt messages must be dicts, got {type(message)}")
+        if "role" not in message or "content" not in message:
+            raise ValueError("Each prompt message must have 'role' and 'content' fields")
+    
+    # Validate reward_model format
+    reward_model = data_sample["reward_model"]
+    if not isinstance(reward_model, dict):
+        raise ValueError(f"'reward_model' must be a dict, got {type(reward_model)}")
+    if "style" not in reward_model or "ground_truth" not in reward_model:
+        raise ValueError("'reward_model' must have 'style' and 'ground_truth' fields")
+    
+    # Validate other fields are strings/dicts as expected
+    if not isinstance(data_sample["data_source"], str):
+        raise ValueError(f"'data_source' must be a string, got {type(data_sample['data_source'])}")
+    if not isinstance(data_sample["ability"], str):
+        raise ValueError(f"'ability' must be a string, got {type(data_sample['ability'])}")
+    if not isinstance(data_sample["extra_info"], dict):
+        raise ValueError(f"'extra_info' must be a dict, got {type(data_sample['extra_info'])}")
+    
+    return True
 
 
 def main():
@@ -231,6 +310,12 @@ Examples:
         print(f"📊 Training data: {train_path}")
         print(f"📊 Validation data: {val_path}")
         print(f"📋 Summary file: {summary_path}")
+        print(f"\nVERL Data Format:")
+        print(f"  ✅ data_source: 'cnn_dailymail' (for reward function indexing)")
+        print(f"  ✅ prompt: Chat template format with role/content")
+        print(f"  ✅ ability: 'summarization' (task category)")
+        print(f"  ✅ reward_model: style='rule', ground_truth=reference_summary")
+        print(f"  ✅ extra_info: split, index, id metadata")
         print(f"\nTo use with VERL, update your config:")
         print(f"  data.train_files: [{str(train_path)}]")
         print(f"  data.val_files: [{str(val_path)}]")
