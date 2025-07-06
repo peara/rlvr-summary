@@ -3,8 +3,8 @@ python3 -m verl.trainer.main_ppo \
   data.train_files=./data/verl/train_data.parquet \
   data.val_files=./data/verl/train_data.parquet \
   data.train_batch_size=4 \
-  data.max_prompt_length=256 \
-  data.max_response_length=256 \
+  data.max_prompt_length=2000 \
+  data.max_response_length=500 \
   actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
   actor_rollout_ref.actor.optim.lr=1e-5 \
   actor_rollout_ref.actor.ppo_mini_batch_size=4 \

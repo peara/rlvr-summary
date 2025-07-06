@@ -5,10 +5,21 @@ from pathlib import Path
 from typing import Optional
 
 # Add the project root to path to import our modules
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from rlvr_summary.rewards.integration import create_reward_function
+
+# Create the reward function once at module level for efficiency
+_config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
+_reward_fn = None
+
+def _get_reward_function():
+    """Get the reward function, creating it if necessary."""
+    global _reward_fn
+    if _reward_fn is None:
+        _reward_fn = create_reward_function(config_path=str(_config_path))
+    return _reward_fn
 
 
 def compute_score(
@@ -43,12 +54,9 @@ def compute_score(
     # For summarization tasks, we typically want to use the original article as source
     source_text = ground_truth if ground_truth else ""
 
-    # Get the config path for our reward system
-    config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
-
     try:
-        # Create our reward function with the configured rules
-        reward_fn = create_reward_function(config_path=str(config_path))
+        # Get our pre-created reward function
+        reward_fn = _get_reward_function()
 
         # Compute the reward using our sophisticated rule system
         score = reward_fn(source_text, solution_str)
