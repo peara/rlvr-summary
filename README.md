@@ -41,15 +41,15 @@ python scripts/prepare_data_verl.py
 ### Training
 
 ```bash
-# Start PPO training with VERL
-python scripts/train_verl.py
+# Start PPO training with VERL, overriding default parameters
+./scripts/train.sh
 ```
 
 ## Configuration
 
 The project uses three main configuration files:
 
-- **`configs/verl_ppo_config.yaml`**: VERL PPO training parameters, model settings, and training hyperparameters
+- **`configs/verl_ppo_config.yaml`**: VERL PPO training parameters, model settings, and training hyperparameters. Cloned from the VERL repository for reference.
 - **`configs/rewards/rule_bundle.yaml`**: Reward function weights and parameters
 - **`configs/data/cnn_dailymail.yaml`**: Dataset configuration and preprocessing settings
 

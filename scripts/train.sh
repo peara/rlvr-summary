@@ -3,8 +3,8 @@ python3 -m verl.trainer.main_ppo \
   data.train_files=./data/verl/train_data.parquet \
   data.val_files=./data/verl/train_data.parquet \
   data.train_batch_size=4 \
-  data.max_prompt_length=2000 \
-  data.max_response_length=500 \
+  data.max_prompt_length=10000 \
+  data.max_response_length=2000 \
   actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
   actor_rollout_ref.actor.optim.lr=1e-5 \
   actor_rollout_ref.actor.ppo_mini_batch_size=4 \
@@ -12,6 +12,8 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.rollout.log_prob_micro_batch_size_per_gpu=2 \
   actor_rollout_ref.rollout.tensor_model_parallel_size=1 \
   actor_rollout_ref.rollout.gpu_memory_utilization=0.4 \
+  actor_rollout_ref.rollout.max_num_batched_tokens=16384 \
+  actor_rollout_ref.rollout.max_model_len=12288 \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=2 \
   critic.optim.lr=1e-5 \
   critic.model.path=Qwen/Qwen2.5-0.5B-Instruct \
