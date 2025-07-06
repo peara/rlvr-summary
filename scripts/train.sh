@@ -17,7 +17,7 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.rollout.gpu_memory_utilization=0.85 \
   actor_rollout_ref.rollout.max_num_batched_tokens=40960 \
   actor_rollout_ref.rollout.max_model_len=10752 \
-  actor_rollout_ref.rollout.max_num_seqs=64 \
+  actor_rollout_ref.rollout.max_num_seqs=32 \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=8 \
   critic.optim.lr=5e-5 \
   critic.model.path=Qwen/Qwen2.5-0.5B-Instruct \
@@ -26,13 +26,15 @@ python3 -m verl.trainer.main_ppo \
   critic.ppo_max_token_len_per_gpu=65536 \
   algorithm.kl_ctrl.kl_coef=0.01 \
   algorithm.kl_ctrl.target_kl=0.1 \
-  trainer.logger=['console'] \
+  trainer.logger=['console','wandb'] \
+  trainer.project_name=rlvr-summary \
+  trainer.experiment_name="simple-rule-$(date +%Y%m%d-%H%M%S)" \
   trainer.val_before_train=true \
   trainer.default_hdfs_dir=null \
   trainer.n_gpus_per_node=1 \
   trainer.nnodes=1 \
   trainer.save_freq=100 \
   trainer.test_freq=50 \
-  trainer.total_epochs=10 \
+  trainer.total_epochs=4 \
   custom_reward_function.path=./src/rlvr_summary/rewards/verl_reward.py \
   custom_reward_function.name=compute_score
