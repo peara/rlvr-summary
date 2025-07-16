@@ -18,6 +18,12 @@ from .rules import (
     NumberConsistencyRule,
     ProfanityDetectionRule,
 )
+from .fenice import FENICEScorer, create_fenice_scorer
+from .combined import (
+    CombinedRewardSystem,
+    CombinedRewardResult,
+    create_combined_reward_system,
+)
 
 __all__ = [
     "BaseRule",
@@ -28,6 +34,11 @@ __all__ = [
     "NumberConsistencyRule",
     "ProfanityDetectionRule",
     "FluencyRule",
+    "FENICEScorer",
+    "create_fenice_scorer",
+    "CombinedRewardSystem",
+    "CombinedRewardResult", 
+    "create_combined_reward_system",
     "RuleBundleRewardSystem",
     "load_rule_bundle_from_config",
     "create_default_rule_bundle",
