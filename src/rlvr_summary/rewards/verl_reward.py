@@ -8,33 +8,18 @@ from typing import Optional
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from rlvr_summary.rewards.integration import create_reward_function
-from rlvr_summary.rewards.combined import create_combined_reward_system
+from .integration import create_reward_function
 
 # Create the reward function once at module level for efficiency
-_config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
+_config_path = project_root / "configs" / "rewards" / "combined_fenice.yaml"
 _reward_fn = None
-_use_combined_system = True  # Enable FENICE + rules by default
 
 def _get_reward_function():
     """Get the reward function, creating it if necessary."""
     global _reward_fn
     if _reward_fn is None:
-        if _use_combined_system:
-            # Use combined FENICE + rule-based system
-            combined_system = create_combined_reward_system(
-                fenice_weight=0.7,
-                rule_weight=0.3
-            )
-            
-            def combined_reward_fn(source: str, summary: str) -> float:
-                result = combined_system.evaluate(source, summary)
-                return result.total_score
-            
-            _reward_fn = combined_reward_fn
-        else:
-            # Fall back to rule-based only
-            _reward_fn = create_reward_function(config_path=str(_config_path))
+        # Use enhanced rule-based system with FENICE included as a weighted rule
+        _reward_fn = create_reward_function(config_path=str(_config_path))
     return _reward_fn
 
 
@@ -44,16 +29,17 @@ def compute_score(
     ground_truth: str,
     extra_info: Optional[dict] = None,
 ) -> float:
-    """VERL-compatible reward function using our sophisticated reward system.
+    """VERL-compatible reward function using our enhanced reward system.
 
-    This function follows VERL's expected signature while using our combined
-    FENICE + rule-based reward system internally.
+    This function follows VERL's expected signature while using our unified
+    rule-based reward system with FENICE factual consistency scoring included
+    as a weighted component.
 
     Args:
         data_source: Name of the dataset (e.g., "cnn_dailymail")
         solution_str: Generated summary text
         ground_truth: Reference summary or original article text
-        extra_info: Additional information (optional, can contain reward config)
+        extra_info: Additional information (optional, currently unused)
 
     Returns:
         float: Reward score between 0 and 1
@@ -70,55 +56,28 @@ def compute_score(
     # For summarization tasks, we typically want to use the original article as source
     source_text = ground_truth if ground_truth else ""
 
-    # Check for reward system configuration in extra_info
-    global _use_combined_system
-    if extra_info:
-        # Allow dynamic configuration
-        use_combined = extra_info.get("use_combined_system", _use_combined_system)
-        fenice_weight = extra_info.get("fenice_weight", 0.7)
-        rule_weight = extra_info.get("rule_weight", 0.3)
-        
-        if use_combined:
-            # Create temporary combined system with custom config
-            from rlvr_summary.rewards.combined import create_combined_reward_system
-            temp_system = create_combined_reward_system(
-                fenice_weight=fenice_weight,
-                rule_weight=rule_weight
-            )
-            result = temp_system.evaluate(source_text, solution_str)
-            score = result.total_score
-        else:
-            # Use rule-based only
-            reward_fn = create_reward_function(config_path=str(_config_path))
-            score = reward_fn(source_text, solution_str)
-    else:
-        # Use default cached reward function
-        reward_fn = _get_reward_function()
-        score = reward_fn(source_text, solution_str)
+    # Use the unified reward function
+    reward_fn = _get_reward_function()
+    score = reward_fn(source_text, solution_str)
 
     # Ensure score is in valid range
     return float(max(0.0, min(1.0, score)))
 
 
-def configure_reward_system(
-    use_combined: bool = True,
-    fenice_weight: float = 0.7,
-    rule_weight: float = 0.3
-) -> None:
+def configure_reward_system(config_path: Optional[str] = None) -> None:
     """Configure the reward system globally.
     
     Args:
-        use_combined: Whether to use combined FENICE + rules system
-        fenice_weight: Weight for FENICE score (default 0.7)
-        rule_weight: Weight for rule-based score (default 0.3)
+        config_path: Path to configuration file (default: combined_fenice.yaml)
     """
-    global _use_combined_system, _reward_fn
+    global _reward_fn, _config_path
     
-    _use_combined_system = use_combined
+    if config_path:
+        _config_path = Path(config_path)
+    
     _reward_fn = None  # Reset cached function to pick up new config
     
-    print(f"Reward system configured: combined={use_combined}, "
-          f"weights=({fenice_weight:.1f}, {rule_weight:.1f})")
+    print(f"Reward system configured to use: {_config_path}")
 
 
 def get_reward_system_info() -> dict:
@@ -128,7 +87,7 @@ def get_reward_system_info() -> dict:
         Dictionary with current configuration
     """
     return {
-        "use_combined_system": _use_combined_system,
         "config_path": str(_config_path),
-        "function_cached": _reward_fn is not None
+        "function_cached": _reward_fn is not None,
+        "system_type": "unified_rule_based_with_fenice"
     }

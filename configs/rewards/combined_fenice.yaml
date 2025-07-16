@@ -1,88 +1,79 @@
-# Combined FENICE + Rule-based Reward System Configuration
-# This configuration enables the integrated FENICE factual consistency scorer
-# combined with rule-based scoring for comprehensive summary evaluation
+# Enhanced Rule-based Reward System Configuration with FENICE
+# This configuration enables the FENICE factual consistency scorer
+# integrated as a weighted rule alongside other evaluation rules
 
-# Overall system configuration
-use_combined_system: true
-threshold: 0.5
+# Rule weights (sum to 1.0)
+# Higher weight on FENICE for factual consistency emphasis
+weights:
+  length_constraint: 0.15
+  entity_overlap: 0.15
+  number_consistency: 0.10
+  profanity_penalty: 0.05
+  fluency: 0.05
+  fenice_factual_consistency: 0.50  # 50% weight on factual consistency
 
-# Weight configuration for combined scoring
-# R = fenice_weight × FENICE + rule_weight × Rules
-fenice_weight: 0.7  # 70% weight on factual consistency
-rule_weight: 0.3    # 30% weight on rule-based metrics
+# Length constraints
+length:
+  min_words: 20
+  max_words: 100
+  optimal_range: [30, 50]
+  penalty_factor: 0.5
 
-# FENICE Configuration
-fenice_config:
+# Entity overlap settings
+entity:
+  min_overlap: 0.3
+  optimal_overlap: 0.7
+  use_word_fallback: true
+
+# Number consistency settings
+numbers:
+  exact_match_bonus: 1.0
+  mismatch_penalty: -0.5
+  tolerance: 0.1
+
+# Profanity detection
+profanity:
+  enabled: true
+  penalty: -1.0
+
+# Fluency scoring
+fluency:
+  enabled: true
+  min_score: 0.5
+  short_sentence_threshold: 5
+  long_sentence_threshold: 50
+  repetition_penalty: -0.3
+
+# FENICE factual consistency configuration
+fenice:
   threshold: 0.5
   batch_size: 8
 
-# Rule-based System Configuration  
-rule_config:
-  weights:
-    length_constraint: 0.25
-    entity_overlap: 0.25
-    number_consistency: 0.25
-    profanity_penalty: 0.15
-    fluency: 0.10
+# Alternative weight configurations for different scenarios
 
-  # Length constraints
-  length:
-    min_words: 20
-    max_words: 100
-    optimal_range: [30, 50]
-    penalty_factor: 0.5
+# Balanced configuration (equal emphasis on factual consistency and other rules)
+balanced_weights:
+  length_constraint: 0.2
+  entity_overlap: 0.2
+  number_consistency: 0.15
+  profanity_penalty: 0.05
+  fluency: 0.05
+  fenice_factual_consistency: 0.35
 
-  # Entity overlap settings
-  entity:
-    min_overlap: 0.3
-    optimal_overlap: 0.7
-    use_word_fallback: true
+# Conservative configuration (lower emphasis on FENICE, more on traditional rules)
+conservative_weights:
+  length_constraint: 0.25
+  entity_overlap: 0.25
+  number_consistency: 0.20
+  profanity_penalty: 0.10
+  fluency: 0.10
+  fenice_factual_consistency: 0.10
 
-  # Number consistency settings
-  number:
-    exact_match_bonus: 1.0
-    mismatch_penalty: -0.5
-    tolerance: 0.1
-
-  # Profanity detection
-  profanity:
-    enabled: true
-    penalty: -1.0
-
-  # Fluency scoring
-  fluency:
-    enabled: true
-    min_score: 0.5
-    short_sentence_threshold: 5
-    long_sentence_threshold: 50
-    repetition_penalty: -0.3
-
-# Logging Configuration
-logging:
-  log_fenice_details: true
-  log_rule_details: true
-  log_combined_metrics: true
-  wandb_metrics: true
-
-# Alternative configurations for different scenarios
-
-# Rule-only configuration (fallback)
-rule_only_config:
-  use_combined_system: false
-  fenice_config:
-    enabled: false
-
-# FENICE-only configuration (experimental)
-fenice_only_config:
-  use_combined_system: true
-  fenice_weight: 1.0
-  rule_weight: 0.0
-  fenice_config:
-    enabled: true
-    threshold: 0.6
-
-# Balanced configuration
-balanced_config:
-  use_combined_system: true
-  fenice_weight: 0.5
-  rule_weight: 0.5
+# FENICE-focused configuration (maximum emphasis on factual consistency)
+fenice_focused_weights:
+  length_constraint: 0.10
+  entity_overlap: 0.10
+  number_consistency: 0.05
+  profanity_penalty: 0.05
+  fluency: 0.05
+  fenice_factual_consistency: 0.65

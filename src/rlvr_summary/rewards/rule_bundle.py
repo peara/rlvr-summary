@@ -12,6 +12,7 @@ from .rules import (
     NumberConsistencyRule,
     ProfanityDetectionRule,
 )
+from .fenice import FENICEScorer
 
 
 class RuleBundleRewardSystem:
@@ -72,6 +73,13 @@ class RuleBundleRewardSystem:
         if "fluency" in weights:
             self.rules["fluency"] = FluencyRule(
                 weight=weights["fluency"], config=self.config.get("fluency", {})
+            )
+        
+        # FENICE factual consistency rule
+        if "fenice_factual_consistency" in weights:
+            self.rules["fenice_factual_consistency"] = FENICEScorer(
+                weight=weights["fenice_factual_consistency"], 
+                config=self.config.get("fenice", {})
             )
 
     def _validate_config(self) -> None:

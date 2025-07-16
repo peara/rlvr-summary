@@ -2,11 +2,12 @@
 
 # Rule weights (sum to 1.0)
 weights:
-  length_constraint: 0.3
-  entity_overlap: 0.3
-  number_consistency: 0.2
-  profanity_penalty: 0.1
-  fluency: 0.1
+  length_constraint: 0.2
+  entity_overlap: 0.2
+  number_consistency: 0.15
+  profanity_penalty: 0.05
+  fluency: 0.05
+  fenice_factual_consistency: 0.35
 
 # Length constraint settings
 length:
@@ -38,3 +39,8 @@ fluency:
   enabled: true
   min_score: 0.5
   model_name: null  # Use default model
+
+# FENICE factual consistency
+fenice:
+  threshold: 0.5
+  batch_size: 8
