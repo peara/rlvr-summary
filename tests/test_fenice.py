@@ -1,4 +1,4 @@
-"""Tests for FENICE scorer and combined reward system."""
+"""Tests for FENICE scorer and rule-based reward system integration."""
 
 import sys
 from pathlib import Path
@@ -10,8 +10,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from rlvr_summary.rewards import (
     FENICEScorer,
     create_fenice_scorer,
-    CombinedRewardSystem,
-    create_combined_reward_system,
+    RuleBundleRewardSystem,
+    load_rule_bundle_from_config,
 )
 
 
@@ -71,43 +71,60 @@ class TestFENICEScorer:
         assert hasattr(scorer, '_load_model')
 
 
-class TestCombinedRewardSystem:
-    """Test combined FENICE + rule-based reward system."""
+class TestRuleBundleWithFENICE:
+    """Test rule-based reward system with FENICE integration."""
 
-    def test_default_weights(self):
-        """Test system creation with default weights."""
-        system = create_combined_reward_system()
+    def test_fenice_integration_config(self):
+        """Test FENICE integration through rule bundle configuration."""
+        config = {
+            "weights": {
+                "length_constraint": 0.3,
+                "fenice_factual_consistency": 0.7,
+            },
+            "length": {
+                "min_words": 20,
+                "max_words": 100,
+            },
+            "fenice": {
+                "threshold": 0.6,
+                "batch_size": 4,
+            }
+        }
         
-        assert system.fenice_weight == 0.7
-        assert system.rule_weight == 0.3
-        assert system.threshold == 0.5
-
-    def test_custom_weights(self):
-        """Test system creation with custom weights."""
-        system = create_combined_reward_system(
-            fenice_weight=0.8,
-            rule_weight=0.2,
-            threshold=0.6
-        )
+        system = RuleBundleRewardSystem(config)
         
-        assert system.fenice_weight == 0.8
-        assert system.rule_weight == 0.2
-        assert system.threshold == 0.6
+        # Check that FENICE rule is properly configured
+        assert "fenice_factual_consistency" in system.rules
+        fenice_rule = system.rules["fenice_factual_consistency"]
+        assert fenice_rule.weight == 0.7
+        assert fenice_rule.threshold == 0.6
+        assert fenice_rule.batch_size == 4
 
-    def test_weight_normalization(self):
-        """Test weight normalization when weights don't sum to 1."""
-        system = CombinedRewardSystem(
-            fenice_weight=0.6,
-            rule_weight=0.6,  # Total = 1.2, should be normalized
-        )
+    def test_config_file_loading(self):
+        """Test loading configuration from file."""
+        config_path = Path(__file__).parent.parent / "configs" / "rewards" / "rule_bundle.yaml"
         
-        # Weights should be normalized to sum to 1.0
-        assert abs(system.fenice_weight - 0.5) < 0.01
-        assert abs(system.rule_weight - 0.5) < 0.01
+        if config_path.exists():
+            system = load_rule_bundle_from_config(config_path)
+            
+            # Should have FENICE rule configured
+            assert "fenice_factual_consistency" in system.rules
+            fenice_rule = system.rules["fenice_factual_consistency"]
+            assert fenice_rule.weight > 0
+            assert fenice_rule.threshold >= 0
 
-    def test_evaluation_fails_fast(self):
-        """Test combined evaluation fails fast when FENICE fails."""
-        system = create_combined_reward_system()
+    def test_evaluation_fails_fast_with_fenice(self):
+        """Test evaluation fails fast when FENICE fails."""
+        config = {
+            "weights": {
+                "length_constraint": 0.5,
+                "fenice_factual_consistency": 0.5,
+            },
+            "length": {"min_words": 20, "max_words": 100},
+            "fenice": {"threshold": 0.5}
+        }
+        
+        system = RuleBundleRewardSystem(config)
         
         source = "John Smith works at Microsoft with 1000 employees."
         summary = "John Smith is at Microsoft which has 1000 workers."
@@ -118,7 +135,16 @@ class TestCombinedRewardSystem:
 
     def test_batch_evaluation_fails_fast(self):
         """Test batch evaluation fails fast."""
-        system = create_combined_reward_system()
+        config = {
+            "weights": {
+                "length_constraint": 0.5,
+                "fenice_factual_consistency": 0.5,
+            },
+            "length": {"min_words": 20, "max_words": 100},
+            "fenice": {"threshold": 0.5}
+        }
+        
+        system = RuleBundleRewardSystem(config)
         
         sources = ["Source 1", "Source 2"]  
         summaries = ["Summary 1", "Summary 2"]
@@ -127,74 +153,41 @@ class TestCombinedRewardSystem:
         with pytest.raises((OSError, ModuleNotFoundError, ImportError, RuntimeError)):
             system.evaluate_batch(sources, summaries)
 
-    def test_weight_update(self):
-        """Test weight updating functionality."""
-        system = create_combined_reward_system()
+    def test_weight_validation(self):
+        """Test weight validation in rule bundle system."""
+        config = {
+            "weights": {
+                "length_constraint": 0.3,
+                "fenice_factual_consistency": 0.8,  # Sum > 1.0
+            },
+            "length": {"min_words": 20, "max_words": 100},
+            "fenice": {"threshold": 0.5}
+        }
         
-        system.update_weights(0.6, 0.4)
-        
-        assert system.fenice_weight == 0.6
-        assert system.rule_weight == 0.4
+        # Should create system and log warning about weights
+        system = RuleBundleRewardSystem(config)
+        assert len(system.rules) == 2
 
-    def test_fenice_configuration(self):
-        """Test FENICE configuration updating."""
-        system = create_combined_reward_system()
+    def test_rule_info_includes_fenice(self):
+        """Test rule information includes FENICE details."""
+        config = {
+            "weights": {
+                "fenice_factual_consistency": 1.0,
+            },
+            "fenice": {
+                "threshold": 0.7,
+                "batch_size": 16,
+            }
+        }
         
-        system.configure_fenice(threshold=0.8, batch_size=16)
+        system = RuleBundleRewardSystem(config)
+        rule_info = system.get_rule_info()
         
-        assert system.fenice_scorer.config["threshold"] == 0.8
-        assert system.fenice_scorer.config["batch_size"] == 16
-
-    def test_system_info(self):
-        """Test system information retrieval."""
-        system = create_combined_reward_system()
-        
-        info = system.get_system_info()
-        
-        assert info["type"] == "CombinedRewardSystem"
-        assert info["fenice_weight"] == 0.7
-        assert info["rule_weight"] == 0.3
-        assert info["threshold"] == 0.5
-        assert "fenice_config" in info
-        assert "rule_system_info" in info
-
-    def test_metrics_extraction_structure(self):
-        """Test metrics structure without actual evaluation."""
-        # We can't test actual metrics extraction because FENICE will fail
-        # But we can test the result structure components
-        from rlvr_summary.rewards.combined import CombinedRewardResult
-        from rlvr_summary.rewards.base import RuleEvaluationResult
-        
-        # Create a mock result
-        rule_result = RuleEvaluationResult(
-            total_score=0.8,
-            rule_scores={"test_rule": 0.8},
-            rule_passed={"test_rule": True},
-            rule_details={"test_rule": {}},
-            pass_rate=1.0
-        )
-        
-        combined_result = CombinedRewardResult(
-            total_score=0.75,
-            fenice_score=0.7,
-            rule_score=0.8,
-            fenice_weight=0.7,
-            rule_weight=0.3,
-            fenice_details={"num_claims": 3},
-            rule_result=rule_result,
-            passed=True
-        )
-        
-        metrics = combined_result.get_metrics()
-        
-        # Check key metrics exist
-        assert "reward/total_score" in metrics
-        assert "reward/fenice_score" in metrics
-        assert "reward/rule_score" in metrics
-        assert "reward/fenice_num_claims" in metrics
-        assert metrics["reward/fenice_score"] == 0.7
-        assert metrics["reward/rule_score"] == 0.8
-        assert metrics["reward/fenice_num_claims"] == 3
+        assert "fenice_factual_consistency" in rule_info
+        fenice_info = rule_info["fenice_factual_consistency"]
+        assert fenice_info["weight"] == 1.0
+        assert fenice_info["threshold"] == 0.7
+        assert fenice_info["class_name"] == "FENICEScorer"
 
 
 def run_fenice_tests():
@@ -207,17 +200,14 @@ def run_fenice_tests():
     test_fenice.test_scorer_creation()
     print("✓ FENICEScorer creation test passed")
     
-    # Test CombinedRewardSystem
-    print("Testing CombinedRewardSystem...")
-    test_combined = TestCombinedRewardSystem()
-    test_combined.test_default_weights()
-    test_combined.test_custom_weights()
-    test_combined.test_weight_normalization()
-    test_combined.test_weight_update()
-    test_combined.test_fenice_configuration()
-    test_combined.test_system_info()
-    test_combined.test_metrics_extraction_structure()
-    print("✓ CombinedRewardSystem tests passed")
+    # Test RuleBundleRewardSystem with FENICE
+    print("Testing RuleBundleRewardSystem with FENICE...")
+    test_rule_bundle = TestRuleBundleWithFENICE()
+    test_rule_bundle.test_fenice_integration_config()
+    test_rule_bundle.test_config_file_loading()
+    test_rule_bundle.test_weight_validation()
+    test_rule_bundle.test_rule_info_includes_fenice()
+    print("✓ RuleBundleRewardSystem with FENICE tests passed")
     
     print("\n✅ All FENICE-related structural tests passed successfully!")
     print("Note: Tests that require model loading will fail fast as expected.")

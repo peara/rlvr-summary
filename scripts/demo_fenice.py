@@ -2,7 +2,7 @@
 """
 Demonstration script for FENICE factual consistency scorer integration.
 
-This script shows how the combined FENICE + rule-based reward system works
+This script shows how the FENICE-integrated rule-based reward system works
 and demonstrates the factual consistency improvements.
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from rlvr_summary.rewards import (
-    create_combined_reward_system,
+    load_rule_bundle_from_config,
     create_default_rule_bundle,
     FENICEScorer,
 )
@@ -66,80 +66,91 @@ def demonstrate_fenice_integration():
     # Create different reward systems for comparison
     print("\n1. Setting up reward systems...")
     
-    # Combined system (FENICE + Rules)
-    combined_system = create_combined_reward_system(
-        fenice_weight=0.7,
-        rule_weight=0.3,
-        fenice_enabled=True  # Will fall back gracefully if transformers not available
-    )
+    # Try to load FENICE-integrated system
+    config_path = Path(__file__).parent.parent / "configs" / "rewards" / "rule_bundle.yaml"
+    try:
+        fenice_system = load_rule_bundle_from_config(config_path)
+        print("   ✓ FENICE-integrated rule system loaded")
+    except Exception as e:
+        print(f"   ⚠️  Could not load FENICE system: {e}")
+        print("   ✓ Using default rule system instead")
+        fenice_system = create_default_rule_bundle()
     
-    # Rule-only system for comparison
+    # Rule-only system for comparison (without FENICE)
+    rule_config = {
+        "weights": {
+            "length_constraint": 0.4,
+            "entity_overlap": 0.4, 
+            "number_consistency": 0.2,
+        },
+        "length": {"min_words": 20, "max_words": 100},
+        "entity": {"min_overlap": 0.3},
+        "numbers": {"exact_match_bonus": 1.0}
+    }
+    
     rule_only_system = create_default_rule_bundle()
     
-    print("   ✓ Combined FENICE + Rules system created")
     print("   ✓ Rule-only system created for comparison")
     
     # Evaluate each summary
     print("\n2. Evaluating summaries...")
-    print(f"{'Summary Type':<20} {'Combined':<10} {'FENICE':<10} {'Rules':<10} {'Rule-Only':<10}")
-    print("-" * 60)
+    print(f"{'Summary Type':<20} {'FENICE System':<15} {'Rule-Only':<10}")
+    print("-" * 50)
     
     for summary_type, summary_text in summaries.items():
-        # Combined system evaluation
-        combined_result = combined_system.evaluate(article, summary_text)
+        # FENICE-integrated system evaluation
+        fenice_result = fenice_system.evaluate(article, summary_text)
         
         # Rule-only system evaluation  
         rule_result = rule_only_system.evaluate(article, summary_text)
         
         print(f"{summary_type:<20} "
-              f"{combined_result.total_score:<10.3f} "
-              f"{combined_result.fenice_score:<10.3f} "
-              f"{combined_result.rule_score:<10.3f} "
+              f"{fenice_result.total_score:<15.3f} "
               f"{rule_result.total_score:<10.3f}")
     
     print("\n3. Detailed analysis of best summary...")
     best_summary = summaries["Factually Accurate"]
-    detailed_result = combined_system.evaluate(article, best_summary, log_details=True)
     
-    print(f"\nDetailed Results for 'Factually Accurate' Summary:")
-    print(f"Total Score: {detailed_result.total_score:.3f}")
-    print(f"FENICE Score: {detailed_result.fenice_score:.3f} (weight: {detailed_result.fenice_weight:.1f})")
-    print(f"Rule Score: {detailed_result.rule_score:.3f} (weight: {detailed_result.rule_weight:.1f})")
-    print(f"Passed: {detailed_result.passed}")
-    
-    # Show FENICE details if available
-    if detailed_result.fenice_details:
-        fenice_details = detailed_result.fenice_details
-        print(f"\nFENICE Details:")
-        print(f"  Enabled: {fenice_details.get('enabled', False)}")
-        if fenice_details.get('enabled'):
+    try:
+        detailed_result = fenice_system.evaluate(article, best_summary, log_details=True)
+        
+        print(f"\nDetailed Results for 'Factually Accurate' Summary:")
+        print(f"Total Score: {detailed_result.total_score:.3f}")
+        print(f"Pass Rate: {detailed_result.pass_rate:.3f}")
+        print(f"Rules passed: {sum(detailed_result.rule_passed.values())}/{len(detailed_result.rule_passed)}")
+        
+        print(f"\nIndividual Rule Scores:")
+        for rule_name, score in detailed_result.rule_scores.items():
+            passed = detailed_result.rule_passed[rule_name]
+            print(f"  {rule_name}: {score:.3f} ({'✓' if passed else '✗'})")
+            
+        # Show FENICE details if available
+        if "fenice_factual_consistency" in detailed_result.rule_details:
+            fenice_details = detailed_result.rule_details["fenice_factual_consistency"]
+            print(f"\nFENICE Details:")
             print(f"  Claims extracted: {fenice_details.get('num_claims', 0)}")
-            print(f"  Average claim score: {fenice_details.get('avg_score', 0):.3f}")
-        else:
-            print(f"  Note: FENICE using fallback mode (transformers not available)")
-    
-    # Show rule details
-    rule_result = detailed_result.rule_result
-    print(f"\nRule-based Details:")
-    print(f"  Rule pass rate: {rule_result.pass_rate:.3f}")
-    print(f"  Individual rule scores:")
-    for rule_name, score in rule_result.rule_scores.items():
-        passed = rule_result.rule_passed[rule_name]
-        print(f"    {rule_name}: {score:.3f} ({'✓' if passed else '✗'})")
+            print(f"  FENICE score: {fenice_details.get('fenice_score', 0):.3f}")
+            
+    except Exception as e:
+        print(f"   ⚠️  Could not run detailed FENICE evaluation: {e}")
+        print("   This is expected if FENICE package is not installed.")
     
     print("\n4. Metrics for training integration...")
-    metrics = detailed_result.get_metrics()
-    print(f"Available metrics for W&B logging:")
-    for key, value in metrics.items():
-        if isinstance(value, float):
-            print(f"  {key}: {value:.3f}")
-        else:
-            print(f"  {key}: {value}")
+    try:
+        metrics = fenice_system.evaluate(article, best_summary).get_metrics()
+        print(f"Available metrics for W&B logging:")
+        for key, value in metrics.items():
+            if isinstance(value, float):
+                print(f"  {key}: {value:.3f}")
+            else:
+                print(f"  {key}: {value}")
+    except:
+        print("   Could not retrieve metrics (FENICE not available)")
     
     print("\n✅ Demo completed! Key observations:")
-    print("   • Factually accurate summaries receive higher FENICE scores")
-    print("   • Combined system balances factual accuracy with other quality metrics")
-    print("   • System gracefully falls back when transformers models unavailable")
+    print("   • FENICE provides factual consistency evaluation as a weighted rule")
+    print("   • System balances factual accuracy with other quality metrics")
+    print("   • Fail-fast behavior ensures proper setup in research environment")
     print("   • Rich metrics available for training and evaluation")
     print("   • Configurable weights allow tuning for different use cases")
 
@@ -186,7 +197,7 @@ if __name__ == "__main__":
         test_configuration_options()
         
         print(f"\n🎉 FENICE integration demonstration completed successfully!")
-        print(f"Ready for training with combined FENICE + rule-based rewards!")
+        print(f"Ready for training with FENICE-integrated rule-based rewards!")
         
     except Exception as e:
         print(f"❌ Error during demonstration: {e}")

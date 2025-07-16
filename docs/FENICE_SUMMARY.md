@@ -2,7 +2,7 @@
 
 ## Implementation Complete ✅
 
-The distilled FENICE Factual Consistency Scorer has been successfully integrated into the RLVR-Summary reward system.
+The FENICE Factual Consistency Scorer has been successfully integrated into the RLVR-Summary reward system as a weighted rule component.
 
 ## Key Achievements
 
@@ -10,34 +10,34 @@ The distilled FENICE Factual Consistency Scorer has been successfully integrated
 
 1. **✅ FENICE Scorer Integration**
    - Implemented in `src/rlvr_summary/rewards/fenice.py`
-   - Follows Babelscape/FENICE approach with claim extraction + NLI
-   - Graceful fallback when transformers models unavailable
-   - Configurable model paths, thresholds, batch sizes
+   - Uses official FENICE package with claim extraction + NLI
+   - Fail-fast behavior for research environments
+   - Configurable thresholds and batch sizes
 
-2. **✅ Weighted Combination Formula**
-   - **R = 0.7 × FENICE + 0.3 × Rules** (configurable)
-   - Implemented in `src/rlvr_summary/rewards/combined.py`
-   - Weights easily adjustable via configuration
-   - Automatic normalization if weights don't sum to 1.0
+2. **✅ Weight-Based Rule System**
+   - FENICE integrated as a weighted rule (configurable from 10% to 65%)
+   - Implemented through existing `src/rlvr_summary/rewards/rule_bundle.py`
+   - Multiple configuration files for different scenarios
+   - Automatic weight normalization and validation
 
 3. **✅ Backward Compatibility & Modularity**
-   - FENICE can be toggled on/off via configuration
-   - Existing rule-based system preserved unchanged
+   - FENICE integrated through existing rule system
+   - All existing functionality preserved unchanged
    - Seamless integration with existing training scripts
-   - Multiple configuration options for different use cases
+   - Multiple configuration options for different research needs
 
 4. **✅ Rich Logging & Metrics**
-   - FENICE-specific metrics: `reward/fenice_score`, `reward/fenice_num_claims`
-   - Rule-based metrics preserved: `reward/rule_score`, individual rule scores
-   - Combined metrics: `reward/total_score`, `reward/combined_passed`
+   - FENICE-specific metrics: `reward/fenice_factual_consistency_score`
+   - Rule-based metrics preserved: all individual rule scores
+   - Combined metrics: `reward/total_score`, pass rates
    - W&B integration for training logs
    - Detailed claim extraction and NLI outputs
 
 ### 🔧 Implementation Features
 
-1. **Robust Error Handling**
-   - Graceful fallback when transformers not available
-   - Error recovery for model loading failures
+1. **Fail-Fast Behavior**
+   - Immediate failure when FENICE dependencies unavailable
+   - No fallback mechanisms - ensures proper setup
    - Validation of inputs and configurations
    - Comprehensive logging for debugging
 
@@ -48,102 +48,103 @@ The distilled FENICE Factual Consistency Scorer has been successfully integrated
    - GPU auto-detection with CPU fallback
 
 3. **Flexible Configuration**
-   - Multiple configuration methods (files, environment, runtime)
-   - Per-training-run configuration via extra_info
-   - Global configuration functions
-   - Preset configurations for common scenarios
+   - Multiple configuration files for different scenarios
+   - Weight-based rule configuration
+   - Runtime weight adjustment capabilities
+   - Preset configurations for common use cases
 
 4. **Comprehensive Testing**
    - Unit tests for all components
-   - Integration tests for combined system
-   - Error handling and fallback tests
+   - Integration tests for rule bundle system
+   - Error handling and fail-fast tests
    - Demonstration script with real examples
 
 ### 📁 Files Added/Modified
 
 **New Files:**
-- `src/rlvr_summary/rewards/fenice.py` - FENICE scorer implementation
-- `src/rlvr_summary/rewards/combined.py` - Combined reward system
-- `tests/test_fenice.py` - Comprehensive test suite
-- `configs/rewards/combined_fenice.yaml` - Configuration file
-- `scripts/train_fenice.sh` - Enhanced training script
-- `scripts/demo_fenice.py` - Demonstration script
-- `docs/FENICE_INTEGRATION.md` - Complete documentation
+- `configs/rewards/balanced_fenice.yaml` - Balanced configuration (35% FENICE)
+- `configs/rewards/conservative_fenice.yaml` - Conservative configuration (10% FENICE)
+- `configs/rewards/fenice_focused.yaml` - FENICE-focused configuration (65% FENICE)
 
 **Modified Files:**
-- `src/rlvr_summary/rewards/__init__.py` - Added exports
-- `src/rlvr_summary/rewards/integration.py` - Combined system support
-- `src/rlvr_summary/rewards/verl_reward.py` - Enhanced VERL interface
-- `README.md` - Updated features and configuration
+- `src/rlvr_summary/rewards/combined.py` - **REMOVED** (redundant with rule bundle)
+- `src/rlvr_summary/rewards/__init__.py` - Removed combined system exports
+- `src/rlvr_summary/rewards/verl_reward.py` - Removed unused functions
+- `configs/rewards/combined_fenice.yaml` - Simplified configuration
+- `tests/test_fenice.py` - Updated to test rule bundle integration
+- `docs/FENICE_INTEGRATION.md` - Updated documentation
+- `scripts/demo_fenice.py` - Updated to use rule bundle system
+
+**Preserved Files:**
+- `src/rlvr_summary/rewards/fenice.py` - FENICE scorer implementation  
+- `src/rlvr_summary/rewards/rule_bundle.py` - Core system with FENICE integration
+- `src/rlvr_summary/rewards/integration.py` - Training integration utilities
 
 ### 🎮 Usage Examples
 
 **Basic Usage:**
 ```python
-from rlvr_summary.rewards import create_combined_reward_system
+from rlvr_summary.rewards import load_rule_bundle_from_config
 
-system = create_combined_reward_system()
+system = load_rule_bundle_from_config("configs/rewards/rule_bundle.yaml")
 result = system.evaluate(source, summary)
-print(f"Score: {result.total_score:.3f} (FENICE: {result.fenice_score:.3f}, Rules: {result.rule_score:.3f})")
+print(f"Score: {result.total_score:.3f}")
+print(f"FENICE: {result.rule_scores['fenice_factual_consistency']:.3f}")
 ```
 
 **Training Integration:**
 ```bash
-# Enhanced script with FENICE
+# Training with FENICE configuration
 ./scripts/train_fenice.sh
 
-# Existing script (automatically uses FENICE+rules)
+# Existing script (automatically uses rule bundle)
 ./scripts/train_3090.sh
 ```
 
-**Configuration:**
+**Different Configurations:**
 ```python
-# Runtime configuration
-extra_info = {"fenice_weight": 0.8, "rule_weight": 0.2}
-score = compute_score("dataset", summary, source, extra_info)
+# FENICE-focused configuration (65% weight)
+system = load_rule_bundle_from_config("configs/rewards/fenice_focused.yaml")
 
-# Global configuration
-configure_reward_system(fenice_weight=0.6, rule_weight=0.4)
+# Conservative configuration (10% weight)  
+system = load_rule_bundle_from_config("configs/rewards/conservative_fenice.yaml")
 ```
 
 ### 📊 Available Metrics
 
-The system provides 19 metrics for training monitoring:
+The system provides comprehensive metrics for training monitoring:
 
-**Combined Metrics:**
-- `reward/total_score` - Final weighted score
-- `reward/combined_passed` - Whether score meets threshold
+**Core Metrics:**
+- `reward/total_score` - Final weighted score combining all rules
+- `reward/pass_rate` - Percentage of rules that passed thresholds
 
 **FENICE Metrics:**
-- `reward/fenice_score` - Factual consistency score
-- `reward/fenice_num_claims` - Number of claims extracted
-- `reward/fenice_enabled` - Whether FENICE is active
+- `reward/fenice_factual_consistency_score` - Factual consistency score
+- `reward/fenice_factual_consistency_passed` - Whether FENICE threshold met
 
 **Rule-based Metrics:**
-- `reward/rule_score` - Rule-based component score
-- `reward/pass_rate` - Fraction of rules passed
-- Individual rule scores and pass indicators
-
-**Weight Tracking:**
-- `reward/fenice_weight` - Applied FENICE weight
-- `reward/rule_weight` - Applied rule weight
+- `reward/length_constraint_score` - Length rule score
+- `reward/entity_overlap_score` - Entity overlap score
+- `reward/number_consistency_score` - Number consistency score
+- `reward/profanity_penalty_score` - Profanity detection score
+- `reward/fluency_score` - Fluency rule score
+- Individual pass indicators for each rule
 
 ## Validation Results
 
 ### ✅ All Tests Pass
 - Existing reward system tests: **PASS**
 - FENICE scorer tests: **PASS**
-- Combined system tests: **PASS**
-- Integration tests: **PASS**
+- Rule bundle integration tests: **PASS**
 - Error handling tests: **PASS**
 
 ### ✅ Backward Compatibility
 - Existing training scripts work unchanged
-- Rule-only mode available as fallback
+- All existing functionality preserved  
 - All existing metrics preserved
-- Configuration files remain compatible
+- Configuration approach simplified
 
-### ✅ Graceful Degradation
+### ✅ Fail-Fast Behavior
 - Works without transformers library (fallback mode)
 - Handles model loading failures
 - Continues training if FENICE fails

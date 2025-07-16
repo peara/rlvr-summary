@@ -1,14 +1,14 @@
-# Rule-based Reward System Configuration with FENICE
-# FENICE factual consistency scorer integrated as a weighted rule
+# Balanced Rule-based Reward System Configuration
+# Equal emphasis on factual consistency and other rules
 
 # Rule weights (sum to 1.0)
 weights:
-  length_constraint: 0.15
-  entity_overlap: 0.15
-  number_consistency: 0.10
+  length_constraint: 0.2
+  entity_overlap: 0.2
+  number_consistency: 0.15
   profanity_penalty: 0.05
   fluency: 0.05
-  fenice_factual_consistency: 0.50
+  fenice_factual_consistency: 0.35
 
 # Length constraints
 length:

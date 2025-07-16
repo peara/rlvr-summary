@@ -6,17 +6,21 @@ This document describes the integration of the FENICE Factual Consistency Scorer
 
 ## Architecture
 
-### Combined Reward System
+### Rule-Based System with FENICE Integration
 
-The new reward system implements a weighted combination:
+FENICE is integrated as a weighted rule within the existing rule-based reward system:
 
 ```
-R = fenice_weight × FENICE_score + rule_weight × Rules_score
+R = Σ(weight_i × rule_score_i) for all rules including FENICE
 ```
 
-**Default Configuration:**
-- FENICE weight: 0.7 (70%)
-- Rules weight: 0.3 (30%)
+**Example Configuration:**
+- Length constraint: 0.15 (15%)
+- Entity overlap: 0.15 (15%)  
+- Number consistency: 0.10 (10%)
+- Profanity penalty: 0.05 (5%)
+- Fluency: 0.05 (5%)
+- FENICE factual consistency: 0.50 (50%)
 
 ### Components
 
@@ -25,14 +29,14 @@ R = fenice_weight × FENICE_score + rule_weight × Rules_score
    - Claim extraction and NLI-based factual consistency scoring
    - Fail-fast behavior for research environments
 
-2. **Combined Reward System** (`src/rlvr_summary/rewards/combined.py`)
-   - Weighted combination of FENICE and rule-based scores
-   - Rich metrics for training integration
+2. **Rule Bundle System** (`src/rlvr_summary/rewards/rule_bundle.py`)
+   - Unified system that includes FENICE as a weighted rule
+   - Configurable rule weights and settings
    - Configurable weights and thresholds
 
-3. **Enhanced Integration** (`src/rlvr_summary/rewards/integration.py`)
-   - Support for both combined and rule-only modes
+3. **Integration Layer** (`src/rlvr_summary/rewards/integration.py`)
    - W&B logging with FENICE metrics
+   - Training loop integration
 
 ## Installation
 
@@ -49,20 +53,16 @@ The FENICE package includes all necessary dependencies for claim extraction and 
 ### Basic Usage
 
 ```python
-from rlvr_summary.rewards import create_combined_reward_system
+from rlvr_summary.rewards import load_rule_bundle_from_config
 
-# Create combined system
-system = create_combined_reward_system(
-    fenice_weight=0.7,
-    rule_weight=0.3,
-    fenice_enabled=True
-)
+# Load system with FENICE integration
+system = load_rule_bundle_from_config("configs/rewards/rule_bundle.yaml")
 
 # Evaluate a summary
 result = system.evaluate(source_text, summary_text)
 print(f"Total score: {result.total_score:.3f}")
-print(f"FENICE score: {result.fenice_score:.3f}")
-print(f"Rule score: {result.rule_score:.3f}")
+print(f"FENICE score: {result.rule_scores['fenice_factual_consistency']:.3f}")
+print(f"Pass rate: {result.pass_rate:.3f}")
 ```
 
 ### Training Integration
@@ -70,87 +70,69 @@ print(f"Rule score: {result.rule_score:.3f}")
 The system integrates seamlessly with existing training scripts:
 
 ```bash
-# Use enhanced training script with FENICE
+# Use training script with FENICE configuration
 ./scripts/train_fenice.sh
 
-# Or use existing script (automatically uses combined system)
+# Or use existing script with rule bundle config
 ./scripts/train_3090.sh
 ```
 
 ### Configuration
 
-#### Environment Variables
-
-```bash
-export ENABLE_FENICE=true      # Enable/disable FENICE
-export FENICE_WEIGHT=0.7       # FENICE weight (0.0-1.0)
-export RULE_WEIGHT=0.3         # Rule weight (0.0-1.0)
-```
-
-#### VERL Interface Configuration
+Configuration is managed through YAML files that specify rule weights:
 
 ```python
-# Configure via extra_info in compute_score
-extra_info = {
-    "fenice_enabled": True,
-    "fenice_weight": 0.6,
-    "rule_weight": 0.4,
-    "use_combined_system": True
-}
+# Use specific configuration 
+from rlvr_summary.rewards import load_rule_bundle_from_config
 
-score = compute_score("dataset", summary, source, extra_info)
-```
-
-#### Global Configuration
-
-```python
-from rlvr_summary.rewards.verl_reward import configure_reward_system
-
-configure_reward_system(
-    use_combined=True,
-    fenice_enabled=True,
-    fenice_weight=0.7,
-    rule_weight=0.3
-)
+system = load_rule_bundle_from_config("configs/rewards/balanced_fenice.yaml")
 ```
 
 ### Configuration Files
 
-Use `configs/rewards/combined_fenice.yaml` for detailed configuration:
+Multiple configuration files are available for different scenarios:
+
+- `configs/rewards/rule_bundle.yaml` - Default configuration with FENICE (35% weight)
+- `configs/rewards/combined_fenice.yaml` - FENICE-focused (50% weight)
+- `configs/rewards/balanced_fenice.yaml` - Balanced approach (35% weight)  
+- `configs/rewards/conservative_fenice.yaml` - Conservative FENICE usage (10% weight)
+- `configs/rewards/fenice_focused.yaml` - Maximum FENICE emphasis (65% weight)
+
+Example configuration structure:
 
 ```yaml
-use_combined_system: true
-fenice_weight: 0.7
-rule_weight: 0.3
+# Rule weights (sum to 1.0)
+weights:
+  length_constraint: 0.15
+  entity_overlap: 0.15
+  number_consistency: 0.10
+  profanity_penalty: 0.05
+  fluency: 0.05
+  fenice_factual_consistency: 0.50
 
-fenice_config:
+# FENICE configuration
+fenice:
   threshold: 0.5
   batch_size: 8
 
-rule_config:
-  weights:
-    length_constraint: 0.25
-    entity_overlap: 0.25
-    # ...
+# Other rule configurations...
 ```
 
 ## Metrics and Logging
 
 ### Training Metrics
 
-The combined system provides rich metrics for tracking:
+The rule bundle system provides rich metrics for tracking:
 
 ```python
 metrics = result.get_metrics()
 # Available metrics:
-# - reward/total_score: Final combined score
-# - reward/fenice_score: FENICE factual consistency score
-# - reward/rule_score: Rule-based score
-# - reward/fenice_weight: Applied FENICE weight
-# - reward/rule_weight: Applied rule weight
-# - reward/fenice_num_claims: Number of claims extracted
-# - reward/fenice_enabled: Whether FENICE is active
-# + All existing rule-based metrics
+# - reward/total_score: Final weighted rule combination score
+# - reward/fenice_factual_consistency_score: FENICE score
+# - reward/fenice_factual_consistency_passed: Whether FENICE threshold met
+# - reward/length_constraint_score: Length rule score
+# - reward/entity_overlap_score: Entity overlap score
+# + All other configured rule metrics
 ```
 
 ### W&B Integration
@@ -173,7 +155,7 @@ result = system.evaluate(source, summary, log_details=True)
 # - FENICE claim extraction details
 # - NLI scoring results
 # - Rule evaluation details
-# - Combined scoring calculation
+# - Weighted scoring calculation
 ```
 
 ## Fallback Behavior
