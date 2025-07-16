@@ -65,7 +65,6 @@ class RewardSystemIntegrator:
                 # Extract weights and configuration
                 fenice_weight = config.get("fenice_weight", 0.7)
                 rule_weight = config.get("rule_weight", 0.3)
-                fenice_enabled = config.get("fenice_enabled", True)
                 fenice_config = config.get("fenice_config", {})
                 rule_config = config.get("rule_config", {})
                 
@@ -150,8 +149,8 @@ class RewardSystemIntegrator:
             # Combined or rule-based result
             total_score = result.total_score
         else:
-            # Fallback for unexpected result format
-            total_score = float(result) if isinstance(result, (int, float)) else 0.5
+            # Unexpected result format - this should not happen
+            raise TypeError(f"Unexpected result format: {type(result)}")
 
         # Track metrics
         self._update_metrics(result)
@@ -173,8 +172,8 @@ class RewardSystemIntegrator:
             # Basic metrics for rule-based result
             return {"reward/total_score": result.total_score}
         else:
-            # Fallback
-            return {"reward/total_score": float(result) if isinstance(result, (int, float)) else 0.5}
+            # Unexpected format
+            raise TypeError(f"Cannot extract metrics from result type: {type(result)}")
 
     def compute_reward_batch(
         self,
@@ -216,7 +215,7 @@ class RewardSystemIntegrator:
         if hasattr(result, 'total_score'):
             return result.total_score
         else:
-            return float(result) if isinstance(result, (int, float)) else 0.5
+            raise TypeError(f"Cannot extract total score from result type: {type(result)}")
 
     def _update_metrics(self, result) -> None:
         """Update cumulative metrics tracking."""
@@ -226,7 +225,7 @@ class RewardSystemIntegrator:
         if hasattr(result, 'total_score'):
             total_score = result.total_score
         else:
-            total_score = float(result) if isinstance(result, (int, float)) else 0.5
+            raise TypeError(f"Cannot extract total score from result type: {type(result)}")
 
         # Update total score
         if "total_score" not in self._cumulative_scores:

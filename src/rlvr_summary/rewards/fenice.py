@@ -25,7 +25,6 @@ class FENICEScorer(BaseRule):
         """
         super().__init__(weight, config)
         
-        self.enabled = self.config.get("enabled", True)
         self.model_name = self.config.get("model_name", "Babelscape/FENICE")
         self.batch_size = self.config.get("batch_size", 8)
         self.max_length = self.config.get("max_length", 512)
@@ -37,10 +36,7 @@ class FENICEScorer(BaseRule):
         self._tokenizer = None
         self._models_loaded = False
         
-        if self.enabled:
-            self.logger.info(f"FENICE scorer initialized with model: {self.model_name}")
-        else:
-            self.logger.info("FENICE scorer disabled")
+        self.logger.info(f"FENICE scorer initialized with model: {self.model_name}")
 
     @property
     def name(self) -> str:
@@ -49,46 +45,40 @@ class FENICEScorer(BaseRule):
 
     def _load_models(self) -> None:
         """Load FENICE models lazily."""
-        if self._models_loaded or not self.enabled:
+        if self._models_loaded:
             return
             
-        try:
-            # Import here to avoid import errors if transformers not available
-            from transformers import (
-                AutoTokenizer, 
-                AutoModelForSequenceClassification,
-                AutoModelForSeq2SeqLM,
-                pipeline
-            )
-            
-            self.logger.info("Loading FENICE models...")
-            
-            # Load tokenizer
-            self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            
-            # For now, use a simplified approach with existing models
-            # In a real implementation, we'd use the actual FENICE models
-            self._claim_extractor = pipeline(
-                "text2text-generation",
-                model="t5-small",  # Placeholder - would use FENICE claim extractor
-                tokenizer=AutoTokenizer.from_pretrained("t5-small"),
-                max_length=self.max_length,
-                device_map="auto" if self._has_gpu() else "cpu"
-            )
-            
-            self._nli_model = pipeline(
-                "text-classification",
-                model="microsoft/deberta-v3-base",  # Placeholder - would use FENICE NLI model
-                device_map="auto" if self._has_gpu() else "cpu"
-            )
-            
-            self._models_loaded = True
-            self.logger.info("FENICE models loaded successfully")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to load FENICE models: {e}")
-            self.enabled = False
-            self._models_loaded = False
+        # Import here to avoid import errors if transformers not available
+        from transformers import (
+            AutoTokenizer, 
+            AutoModelForSequenceClassification,
+            AutoModelForSeq2SeqLM,
+            pipeline
+        )
+        
+        self.logger.info("Loading FENICE models...")
+        
+        # Load tokenizer
+        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        
+        # For now, use a simplified approach with existing models
+        # In a real implementation, we'd use the actual FENICE models
+        self._claim_extractor = pipeline(
+            "text2text-generation",
+            model="t5-small",  # Placeholder - would use FENICE claim extractor
+            tokenizer=AutoTokenizer.from_pretrained("t5-small"),
+            max_length=self.max_length,
+            device_map="auto" if self._has_gpu() else "cpu"
+        )
+        
+        self._nli_model = pipeline(
+            "text-classification",
+            model="microsoft/deberta-v3-base",  # Placeholder - would use FENICE NLI model
+            device_map="auto" if self._has_gpu() else "cpu"
+        )
+        
+        self._models_loaded = True
+        self.logger.info("FENICE models loaded successfully")
 
     def _has_gpu(self) -> bool:
         """Check if GPU is available."""
@@ -107,26 +97,14 @@ class FENICEScorer(BaseRule):
         Returns:
             List of extracted claims
         """
-        if not self.enabled:
-            return []
-            
         self._load_models()
         
-        if not self._claim_extractor:
-            # Fallback to sentence splitting if model not available
-            return self._simple_sentence_split(summary)
+        # For this implementation, we'll use simple sentence splitting
+        # In a real FENICE implementation, this would use the claim extraction model
+        claims = self._simple_sentence_split(summary)
         
-        try:
-            # For this implementation, we'll use simple sentence splitting
-            # In a real FENICE implementation, this would use the claim extraction model
-            claims = self._simple_sentence_split(summary)
-            
-            self.logger.debug(f"Extracted {len(claims)} claims from summary")
-            return claims
-            
-        except Exception as e:
-            self.logger.error(f"Claim extraction failed: {e}")
-            return self._simple_sentence_split(summary)
+        self.logger.debug(f"Extracted {len(claims)} claims from summary")
+        return claims
 
     def _simple_sentence_split(self, text: str) -> List[str]:
         """Simple sentence splitting as fallback."""
@@ -150,64 +128,31 @@ class FENICEScorer(BaseRule):
         Returns:
             Dictionary with NLI score and details
         """
-        if not self.enabled:
-            return {"score": 0.7, "label": "NEUTRAL", "confidence": 0.0}
-            
         self._load_models()
         
-        if not self._nli_model:
-            # Fallback scoring based on word overlap
-            return self._fallback_nli_score(claim, source)
+        # Prepare input for NLI model
+        # Format: premise: source, hypothesis: claim
+        input_text = f"premise: {source[:500]} hypothesis: {claim}"  # Truncate for efficiency
         
-        try:
-            # Prepare input for NLI model
-            # Format: premise: source, hypothesis: claim
-            input_text = f"premise: {source[:500]} hypothesis: {claim}"  # Truncate for efficiency
-            
-            # Get NLI prediction
-            result = self._nli_model(input_text)
-            
-            # Extract score and label
-            label = result[0]['label'] if result else "NEUTRAL"
-            confidence = result[0]['score'] if result else 0.0
-            
-            # Convert to factual consistency score
-            if label == "ENTAILMENT":
-                score = confidence
-            elif label == "NEUTRAL":
-                score = 0.5  # Neutral baseline
-            else:  # CONTRADICTION
-                score = 1.0 - confidence  # Penalty for contradiction
-            
-            return {
-                "score": score,
-                "label": label,
-                "confidence": confidence
-            }
-            
-        except Exception as e:
-            self.logger.error(f"NLI scoring failed: {e}")
-            return self._fallback_nli_score(claim, source)
-
-    def _fallback_nli_score(self, claim: str, source: str) -> Dict[str, Any]:
-        """Fallback NLI scoring based on word overlap."""
-        from .base import TextProcessor
+        # Get NLI prediction
+        result = self._nli_model(input_text)
         
-        claim_words = set(TextProcessor.extract_words(claim))
-        source_words = set(TextProcessor.extract_words(source))
+        # Extract score and label
+        label = result[0]['label'] if result else "NEUTRAL"
+        confidence = result[0]['score'] if result else 0.0
         
-        if not claim_words:
-            return {"score": 0.5, "label": "NEUTRAL", "confidence": 0.0}
-        
-        overlap = TextProcessor.jaccard_similarity(claim_words, source_words)
-        
-        # Convert overlap to factual consistency score
-        score = 0.3 + (overlap * 0.7)  # Scale to 0.3-1.0 range
+        # Convert to factual consistency score
+        if label == "ENTAILMENT":
+            score = confidence
+        elif label == "NEUTRAL":
+            score = 0.5  # Neutral baseline
+        else:  # CONTRADICTION
+            score = 1.0 - confidence  # Penalty for contradiction
         
         return {
             "score": score,
-            "label": "COMPUTED",
-            "confidence": overlap
+            "label": label,
+            "confidence": confidence
         }
 
     def evaluate(self, source: str, summary: str) -> Dict[str, Any]:
@@ -223,78 +168,57 @@ class FENICEScorer(BaseRule):
                 - details: Detailed evaluation results
                 - passed: Whether the score meets threshold
         """
-        if not self.enabled:
+        if not summary or not source:
+            raise ValueError("Empty input: both summary and source must be provided")
+        
+        # Extract claims from summary
+        claims = self._extract_claims(summary)
+        
+        if not claims:
             return {
-                "score": 0.7,  # Neutral score when disabled
-                "details": {"enabled": False, "reason": "FENICE disabled"},
+                "score": 0.5,  # Neutral for no claims
+                "details": {"claims": [], "no_claims": True},
                 "passed": True
             }
         
-        if not summary or not source:
-            return {
-                "score": 0.0,
-                "details": {"error": "Empty input"},
-                "passed": False
-            }
+        # Score each claim
+        claim_scores = []
+        claim_details = []
         
-        try:
-            # Extract claims from summary
-            claims = self._extract_claims(summary)
-            
-            if not claims:
-                return {
-                    "score": 0.5,  # Neutral for no claims
-                    "details": {"claims": [], "no_claims": True},
-                    "passed": True
-                }
-            
-            # Score each claim
-            claim_scores = []
-            claim_details = []
-            
-            for claim in claims:
-                nli_result = self._score_claim_nli(claim, source)
-                claim_scores.append(nli_result["score"])
-                claim_details.append({
-                    "claim": claim,
-                    "nli_score": nli_result["score"],
-                    "nli_label": nli_result["label"],
-                    "nli_confidence": nli_result["confidence"]
-                })
-            
-            # Aggregate scores (average)
-            total_score = sum(claim_scores) / len(claim_scores)
-            
-            # Determine if passed
-            passed = total_score >= self.threshold
-            
-            details = {
-                "num_claims": len(claims),
-                "claim_scores": claim_scores,
-                "claim_details": claim_details,
-                "avg_score": total_score,
-                "threshold": self.threshold,
-                "enabled": self.enabled
-            }
-            
-            self.logger.debug(
-                f"FENICE evaluation: {len(claims)} claims, "
-                f"avg_score={total_score:.3f}, passed={passed}"
-            )
-            
-            return {
-                "score": total_score,
-                "details": details,
-                "passed": passed
-            }
-            
-        except Exception as e:
-            self.logger.error(f"FENICE evaluation failed: {e}")
-            return {
-                "score": 0.3,  # Lower fallback score
-                "details": {"error": str(e), "enabled": self.enabled},
-                "passed": False
-            }
+        for claim in claims:
+            nli_result = self._score_claim_nli(claim, source)
+            claim_scores.append(nli_result["score"])
+            claim_details.append({
+                "claim": claim,
+                "nli_score": nli_result["score"],
+                "nli_label": nli_result["label"],
+                "nli_confidence": nli_result["confidence"]
+            })
+        
+        # Aggregate scores (average)
+        total_score = sum(claim_scores) / len(claim_scores)
+        
+        # Determine if passed
+        passed = total_score >= self.threshold
+        
+        details = {
+            "num_claims": len(claims),
+            "claim_scores": claim_scores,
+            "claim_details": claim_details,
+            "avg_score": total_score,
+            "threshold": self.threshold,
+        }
+        
+        self.logger.debug(
+            f"FENICE evaluation: {len(claims)} claims, "
+            f"avg_score={total_score:.3f}, passed={passed}"
+        )
+        
+        return {
+            "score": total_score,
+            "details": details,
+            "passed": passed
+        }
 
     def batch_evaluate(
         self, 
@@ -323,7 +247,6 @@ class FENICEScorer(BaseRule):
 
 def create_fenice_scorer(
     weight: float = 1.0,
-    enabled: bool = True,
     model_name: str = "Babelscape/FENICE",
     threshold: float = 0.5
 ) -> FENICEScorer:
@@ -331,7 +254,6 @@ def create_fenice_scorer(
     
     Args:
         weight: Weight in overall reward calculation
-        enabled: Whether to enable FENICE scoring
         model_name: Hugging Face model name for FENICE
         threshold: Threshold for passing score
         
@@ -339,7 +261,6 @@ def create_fenice_scorer(
         Configured FENICEScorer instance
     """
     config = {
-        "enabled": enabled,
         "model_name": model_name,
         "threshold": threshold,
         "batch_size": 8,

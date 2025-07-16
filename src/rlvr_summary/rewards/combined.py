@@ -70,7 +70,6 @@ class CombinedRewardResult:
         # Add FENICE-specific metrics
         if self.fenice_details:
             metrics["reward/fenice_num_claims"] = self.fenice_details.get("num_claims", 0)
-            metrics["reward/fenice_enabled"] = float(self.fenice_details.get("enabled", False))
 
         # Add rule-based metrics
         rule_metrics = self.rule_result.get_metrics()
@@ -154,65 +153,46 @@ class CombinedRewardSystem:
         Returns:
             CombinedRewardResult with detailed scoring
         """
-        try:
-            # Get FENICE score
-            fenice_result = self.fenice_scorer.evaluate(source, summary)
-            fenice_score = fenice_result["score"]
-            fenice_details = fenice_result["details"]
-            
-            # Get rule-based score
-            rule_result = self.rule_system.evaluate(source, summary, log_details=log_details)
-            rule_score = rule_result.total_score
-            
-            # Compute weighted combination
-            total_score = (self.fenice_weight * fenice_score) + (self.rule_weight * rule_score)
-            
-            # Determine if passed
-            passed = total_score >= self.threshold
-            
-            # Create combined result
-            combined_result = CombinedRewardResult(
-                total_score=total_score,
-                fenice_score=fenice_score,
-                rule_score=rule_score,
-                fenice_weight=self.fenice_weight,
-                rule_weight=self.rule_weight,
-                fenice_details=fenice_details,
-                rule_result=rule_result,
-                passed=passed,
+        # Get FENICE score
+        fenice_result = self.fenice_scorer.evaluate(source, summary)
+        fenice_score = fenice_result["score"]
+        fenice_details = fenice_result["details"]
+        
+        # Get rule-based score
+        rule_result = self.rule_system.evaluate(source, summary, log_details=log_details)
+        rule_score = rule_result.total_score
+        
+        # Compute weighted combination
+        total_score = (self.fenice_weight * fenice_score) + (self.rule_weight * rule_score)
+        
+        # Determine if passed
+        passed = total_score >= self.threshold
+        
+        # Create combined result
+        combined_result = CombinedRewardResult(
+            total_score=total_score,
+            fenice_score=fenice_score,
+            rule_score=rule_score,
+            fenice_weight=self.fenice_weight,
+            rule_weight=self.rule_weight,
+            fenice_details=fenice_details,
+            rule_result=rule_result,
+            passed=passed,
+        )
+        
+        if log_details:
+            self.logger.info(
+                f"Combined evaluation: total={total_score:.3f} "
+                f"(FENICE={fenice_score:.3f}×{self.fenice_weight:.3f} + "
+                f"Rules={rule_score:.3f}×{self.rule_weight:.3f}), "
+                f"passed={passed}"
             )
             
-            if log_details:
-                self.logger.info(
-                    f"Combined evaluation: total={total_score:.3f} "
-                    f"(FENICE={fenice_score:.3f}×{self.fenice_weight:.3f} + "
-                    f"Rules={rule_score:.3f}×{self.rule_weight:.3f}), "
-                    f"passed={passed}"
-                )
-                
-                # Log FENICE details
-                if fenice_details.get("enabled", False):
-                    num_claims = fenice_details.get("num_claims", 0)
-                    self.logger.info(f"FENICE: {num_claims} claims extracted")
-                else:
-                    self.logger.info("FENICE: disabled")
-            
-            return combined_result
-            
-        except Exception as e:
-            self.logger.error(f"Combined evaluation failed: {e}")
-            
-            # Return fallback result
-            return CombinedRewardResult(
-                total_score=0.3,
-                fenice_score=0.3,
-                rule_score=0.3,
-                fenice_weight=self.fenice_weight,
-                rule_weight=self.rule_weight,
-                fenice_details={"error": str(e)},
-                rule_result=RuleEvaluationResult(0.3, {}, {}, {}, 0.0),
-                passed=False,
-            )
+            # Log FENICE details
+            num_claims = fenice_details.get("num_claims", 0)
+            self.logger.info(f"FENICE: {num_claims} claims extracted")
+        
+        return combined_result
 
     def evaluate_batch(
         self,
@@ -235,23 +215,8 @@ class CombinedRewardSystem:
         
         results = []
         for i, (source, summary) in enumerate(zip(sources, summaries)):
-            try:
-                result = self.evaluate(source, summary, log_details=log_details)
-                results.append(result)
-            except Exception as e:
-                self.logger.error(f"Batch evaluation failed for item {i}: {e}")
-                # Add fallback result
-                fallback = CombinedRewardResult(
-                    total_score=0.3,
-                    fenice_score=0.3,
-                    rule_score=0.3,
-                    fenice_weight=self.fenice_weight,
-                    rule_weight=self.rule_weight,
-                    fenice_details={"error": str(e)},
-                    rule_result=RuleEvaluationResult(0.3, {}, {}, {}, 0.0),
-                    passed=False,
-                )
-                results.append(fallback)
+            result = self.evaluate(source, summary, log_details=log_details)
+            results.append(result)
         
         if log_details and results:
             avg_total = sum(r.total_score for r in results) / len(results)
@@ -316,7 +281,6 @@ class CombinedRewardSystem:
             "fenice_weight": self.fenice_weight,
             "rule_weight": self.rule_weight,
             "threshold": self.threshold,
-            "fenice_enabled": self.fenice_scorer.enabled,
             "fenice_config": self.fenice_scorer.config,
             "rule_system_info": self.rule_system.get_rule_info(),
         }
@@ -325,7 +289,6 @@ class CombinedRewardSystem:
 def create_combined_reward_system(
     fenice_weight: float = 0.7,
     rule_weight: float = 0.3,
-    fenice_enabled: bool = True,
     threshold: float = 0.5,
     **kwargs
 ) -> CombinedRewardSystem:
@@ -334,19 +297,15 @@ def create_combined_reward_system(
     Args:
         fenice_weight: Weight for FENICE score (default 0.7)
         rule_weight: Weight for rule-based score (default 0.3)  
-        fenice_enabled: Whether to enable FENICE scorer
         threshold: Threshold for passing combined score
         **kwargs: Additional configuration
         
     Returns:
         Configured CombinedRewardSystem
     """
-    fenice_config = {"enabled": fenice_enabled}
-    
     return CombinedRewardSystem(
         fenice_weight=fenice_weight,
         rule_weight=rule_weight,
-        fenice_config=fenice_config,
         threshold=threshold,
         **kwargs
     )

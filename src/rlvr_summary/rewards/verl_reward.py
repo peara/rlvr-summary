@@ -24,8 +24,7 @@ def _get_reward_function():
             # Use combined FENICE + rule-based system
             combined_system = create_combined_reward_system(
                 fenice_weight=0.7,
-                rule_weight=0.3,
-                fenice_enabled=True  # Enable FENICE by default
+                rule_weight=0.3
             )
             
             def combined_reward_fn(source: str, summary: str) -> float:
@@ -71,53 +70,38 @@ def compute_score(
     # For summarization tasks, we typically want to use the original article as source
     source_text = ground_truth if ground_truth else ""
 
-    try:
-        # Check for reward system configuration in extra_info
-        global _use_combined_system
-        if extra_info:
-            # Allow dynamic configuration
-            use_combined = extra_info.get("use_combined_system", _use_combined_system)
-            fenice_enabled = extra_info.get("fenice_enabled", True)
-            fenice_weight = extra_info.get("fenice_weight", 0.7)
-            rule_weight = extra_info.get("rule_weight", 0.3)
-            
-            if use_combined:
-                # Create temporary combined system with custom config
-                from rlvr_summary.rewards.combined import create_combined_reward_system
-                temp_system = create_combined_reward_system(
-                    fenice_weight=fenice_weight,
-                    rule_weight=rule_weight,
-                    fenice_enabled=fenice_enabled
-                )
-                result = temp_system.evaluate(source_text, solution_str)
-                score = result.total_score
-            else:
-                # Use rule-based only
-                reward_fn = create_reward_function(config_path=str(_config_path))
-                score = reward_fn(source_text, solution_str)
+    # Check for reward system configuration in extra_info
+    global _use_combined_system
+    if extra_info:
+        # Allow dynamic configuration
+        use_combined = extra_info.get("use_combined_system", _use_combined_system)
+        fenice_weight = extra_info.get("fenice_weight", 0.7)
+        rule_weight = extra_info.get("rule_weight", 0.3)
+        
+        if use_combined:
+            # Create temporary combined system with custom config
+            from rlvr_summary.rewards.combined import create_combined_reward_system
+            temp_system = create_combined_reward_system(
+                fenice_weight=fenice_weight,
+                rule_weight=rule_weight
+            )
+            result = temp_system.evaluate(source_text, solution_str)
+            score = result.total_score
         else:
-            # Use default cached reward function
-            reward_fn = _get_reward_function()
+            # Use rule-based only
+            reward_fn = create_reward_function(config_path=str(_config_path))
             score = reward_fn(source_text, solution_str)
+    else:
+        # Use default cached reward function
+        reward_fn = _get_reward_function()
+        score = reward_fn(source_text, solution_str)
 
-        # Ensure score is in valid range
-        return float(max(0.0, min(1.0, score)))
-
-    except Exception as e:
-        # Fallback to basic scoring if our system fails
-        print(f"Warning: Reward system failed ({e}), using fallback score")
-        # Simple fallback based on length and basic properties
-        if len(solution_str.strip()) < 10:
-            return 0.1  # Very short summaries get low score
-        elif len(solution_str.strip()) > 500:
-            return 0.3  # Very long summaries get medium-low score
-        else:
-            return 0.5  # Reasonable length gets neutral score
+    # Ensure score is in valid range
+    return float(max(0.0, min(1.0, score)))
 
 
 def configure_reward_system(
     use_combined: bool = True,
-    fenice_enabled: bool = True,
     fenice_weight: float = 0.7,
     rule_weight: float = 0.3
 ) -> None:
@@ -125,7 +109,6 @@ def configure_reward_system(
     
     Args:
         use_combined: Whether to use combined FENICE + rules system
-        fenice_enabled: Whether to enable FENICE scorer
         fenice_weight: Weight for FENICE score (default 0.7)
         rule_weight: Weight for rule-based score (default 0.3)
     """
@@ -135,7 +118,6 @@ def configure_reward_system(
     _reward_fn = None  # Reset cached function to pick up new config
     
     print(f"Reward system configured: combined={use_combined}, "
-          f"fenice_enabled={fenice_enabled}, "
           f"weights=({fenice_weight:.1f}, {rule_weight:.1f})")
 
 
