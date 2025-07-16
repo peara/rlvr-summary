@@ -13,9 +13,12 @@ This project implements PPO-based reinforcement learning for text summarization 
 ## Features
 
 - **VERL Integration**: Modern PPO implementation with efficient training
+- **FENICE Factual Consistency**: Integrated distilled FENICE scorer for factual accuracy
+- **Combined Reward System**: Weighted combination of FENICE (70%) + rule-based rewards (30%)
 - **Functional Rewards**: Rule-based rewards for length, relevance, and quality
 - **CNN/DailyMail Support**: Built-in data pipeline for the standard summarization dataset
 - **Minimal Architecture**: Clean, focused codebase without legacy dependencies
+- **Rich Metrics**: Comprehensive logging for training and evaluation
 
 ## Quick Start
 
@@ -47,11 +50,30 @@ python scripts/prepare_data_verl.py
 
 ## Configuration
 
-The project uses three main configuration files:
+The project uses main configuration files:
 
-- **`configs/verl_ppo_config.yaml`**: VERL PPO training parameters, model settings, and training hyperparameters. Cloned from the VERL repository for reference.
-- **`configs/rewards/rule_bundle.yaml`**: Reward function weights and parameters
+- **`configs/verl_ppo_config.yaml`**: VERL PPO training parameters, model settings, and training hyperparameters
+- **`configs/rewards/rule_bundle.yaml`**: Rule-based reward function weights and parameters  
+- **`configs/rewards/combined_fenice.yaml`**: Combined FENICE + rule-based reward configuration
 - **`configs/data/cnn_dailymail.yaml`**: Dataset configuration and preprocessing settings
+
+### Reward System Configuration
+
+The reward system supports two modes:
+
+**Combined Mode (Default)**: Uses FENICE factual consistency + rule-based rewards
+```yaml
+use_combined_system: true
+fenice_weight: 0.7  # 70% factual consistency
+rule_weight: 0.3    # 30% rule-based metrics
+```
+
+**Rule-only Mode**: Traditional rule-based rewards only
+```yaml
+use_combined_system: false
+```
+
+See [`docs/FENICE_INTEGRATION.md`](docs/FENICE_INTEGRATION.md) for detailed configuration options.
 
 ### Model Configuration
 

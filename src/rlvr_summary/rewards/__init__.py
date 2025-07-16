@@ -18,6 +18,7 @@ from .rules import (
     NumberConsistencyRule,
     ProfanityDetectionRule,
 )
+from .fenice import FENICEScorer, create_fenice_scorer
 
 __all__ = [
     "BaseRule",
@@ -28,6 +29,8 @@ __all__ = [
     "NumberConsistencyRule",
     "ProfanityDetectionRule",
     "FluencyRule",
+    "FENICEScorer",
+    "create_fenice_scorer",
     "RuleBundleRewardSystem",
     "load_rule_bundle_from_config",
     "create_default_rule_bundle",

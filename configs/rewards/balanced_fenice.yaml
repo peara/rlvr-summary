@@ -1,4 +1,5 @@
-# Rule-based reward system configuration for Phase A
+# Balanced Rule-based Reward System Configuration
+# Equal emphasis on factual consistency and other rules
 
 # Rule weights (sum to 1.0)
 weights:
@@ -9,38 +10,39 @@ weights:
   fluency: 0.05
   fenice_factual_consistency: 0.35
 
-# Length constraint settings
+# Length constraints
 length:
   min_words: 20
   max_words: 100
-  optimal_range: [30, 80]
+  optimal_range: [30, 50]
   penalty_factor: 0.5
 
-# Entity overlap settings  
+# Entity overlap settings
 entity:
   min_overlap: 0.3
   optimal_overlap: 0.7
-  overlap_threshold: 0.5
+  use_word_fallback: true
 
-# Number consistency
+# Number consistency settings
 numbers:
   exact_match_bonus: 1.0
-  partial_match_bonus: 0.5
   mismatch_penalty: -0.5
+  tolerance: 0.1
 
 # Profanity detection
 profanity:
   enabled: true
   penalty: -1.0
-  wordlist_path: null  # Use default wordlist
 
 # Fluency scoring
 fluency:
   enabled: true
   min_score: 0.5
-  model_name: null  # Use default model
+  short_sentence_threshold: 5
+  long_sentence_threshold: 50
+  repetition_penalty: -0.3
 
-# FENICE factual consistency
+# FENICE factual consistency configuration
 fenice:
   threshold: 0.5
   batch_size: 8

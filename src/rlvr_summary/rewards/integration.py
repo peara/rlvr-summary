@@ -50,7 +50,7 @@ class RewardSystemIntegrator:
         self.logger = logging.getLogger(f"{__class__.__module__}.{__class__.__name__}")
         self.wandb_logger = wandb_logger
 
-        # Load reward system
+        # Load reward system using unified rule-based approach
         if config_path:
             self.reward_system = load_rule_bundle_from_config(config_path)
         elif config:
@@ -115,6 +115,9 @@ class RewardSystemIntegrator:
         """
         result = self.reward_system.evaluate(source, summary, log_details=log_details)
 
+        # Result is always a RuleEvaluationResult from the unified system
+        total_score = result.total_score
+
         # Track metrics
         self._update_metrics(result)
 
@@ -125,7 +128,7 @@ class RewardSystemIntegrator:
                 metrics["step"] = step
             self.wandb_logger.log(metrics, step=step)
 
-        return result.total_score
+        return total_score
 
     def compute_reward_batch(
         self,
@@ -166,10 +169,13 @@ class RewardSystemIntegrator:
         """Update cumulative metrics tracking."""
         self._total_evaluations += 1
 
+        # Extract scores from rule evaluation result
+        total_score = result.total_score
+
         # Update total score
         if "total_score" not in self._cumulative_scores:
             self._cumulative_scores["total_score"] = []
-        self._cumulative_scores["total_score"].append(result.total_score)
+        self._cumulative_scores["total_score"].append(total_score)
 
         # Update rule scores
         for rule_name, score in result.rule_scores.items():
@@ -193,26 +199,32 @@ class RewardSystemIntegrator:
             return {}
 
         batch_size = len(results)
+        
+        # Calculate total scores
+        total_scores = [r.total_score for r in results]
         metrics = {
             "reward/batch_size": batch_size,
-            "reward/batch_avg_score": sum(r.total_score for r in results) / batch_size,
-            "reward/batch_avg_pass_rate": sum(r.pass_rate for r in results)
-            / batch_size,
+            "reward/batch_avg_score": sum(total_scores) / batch_size,
         }
 
+        # Rule-based system metrics  
+        pass_rates = [r.pass_rate for r in results]
+        metrics["reward/batch_avg_pass_rate"] = sum(pass_rates) / batch_size
+        
         # Add per-rule batch averages
-        rule_names = list(results[0].rule_scores.keys())
-        for rule_name in rule_names:
-            avg_score = (
-                sum(r.rule_scores.get(rule_name, 0.0) for r in results) / batch_size
-            )
-            avg_pass_rate = (
-                sum(float(r.rule_passed.get(rule_name, False)) for r in results)
-                / batch_size
-            )
+        if results[0].rule_scores:
+            rule_names = list(results[0].rule_scores.keys())
+            for rule_name in rule_names:
+                avg_score = (
+                    sum(r.rule_scores.get(rule_name, 0.0) for r in results) / batch_size
+                )
+                avg_pass_rate = (
+                    sum(float(r.rule_passed.get(rule_name, False)) for r in results)
+                    / batch_size
+                )
 
-            metrics[f"reward/batch_{rule_name}_score"] = avg_score
-            metrics[f"reward/batch_{rule_name}_pass_rate"] = avg_pass_rate
+                metrics[f"reward/batch_{rule_name}_score"] = avg_score
+                metrics[f"reward/batch_{rule_name}_pass_rate"] = avg_pass_rate
 
         return metrics
 

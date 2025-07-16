@@ -8,7 +8,7 @@ from typing import Optional
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from rlvr_summary.rewards.integration import create_reward_function
+from .integration import create_reward_function
 
 # Create the reward function once at module level for efficiency
 _config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
@@ -18,6 +18,7 @@ def _get_reward_function():
     """Get the reward function, creating it if necessary."""
     global _reward_fn
     if _reward_fn is None:
+        # Use rule-based system with FENICE included as a weighted rule
         _reward_fn = create_reward_function(config_path=str(_config_path))
     return _reward_fn
 
@@ -28,16 +29,17 @@ def compute_score(
     ground_truth: str,
     extra_info: Optional[dict] = None,
 ) -> float:
-    """VERL-compatible reward function using our existing reward system.
+    """VERL-compatible reward function using our rule-based reward system.
 
-    This function follows VERL's expected signature while using our sophisticated
-    rule-based reward system internally.
+    This function follows VERL's expected signature while using our rule-based
+    reward system with FENICE factual consistency scoring included as a weighted
+    component alongside other rules.
 
     Args:
         data_source: Name of the dataset (e.g., "cnn_dailymail")
         solution_str: Generated summary text
         ground_truth: Reference summary or original article text
-        extra_info: Additional information (optional)
+        extra_info: Additional information (optional, currently unused)
 
     Returns:
         float: Reward score between 0 and 1
@@ -54,16 +56,12 @@ def compute_score(
     # For summarization tasks, we typically want to use the original article as source
     source_text = ground_truth if ground_truth else ""
 
-    try:
-        # Get our pre-created reward function
-        reward_fn = _get_reward_function()
+    # Use the unified reward function
+    reward_fn = _get_reward_function()
+    score = reward_fn(source_text, solution_str)
 
-        # Compute the reward using our sophisticated rule system
-        score = reward_fn(source_text, solution_str)
+    # Ensure score is in valid range
+    return float(max(0.0, min(1.0, score)))
 
-        # Ensure score is in valid range
-        return float(max(0.0, min(1.0, score)))
 
-    except Exception as e:
-        # Fallback to basic scoring if our system fails
-        print(f"Warning: Reward system failed ({e})")
+
