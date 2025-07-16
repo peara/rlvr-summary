@@ -13,10 +13,8 @@ rule_weight: 0.3    # 30% weight on rule-based metrics
 
 # FENICE Configuration
 fenice_config:
-  model_name: "Babelscape/FENICE"
   threshold: 0.5
   batch_size: 8
-  max_length: 512
 
 # Rule-based System Configuration  
 rule_config:

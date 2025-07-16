@@ -21,10 +21,10 @@ class TestFENICEScorer:
     def test_scorer_creation(self):
         """Test FENICE scorer creation."""
         scorer = create_fenice_scorer()
-        assert scorer.model_name == "Babelscape/FENICE"
         assert scorer.threshold == 0.5
         assert scorer.batch_size == 8
-        assert scorer.max_length == 512
+        assert scorer._fenice_model is None  # Model not loaded yet
+        assert not scorer._model_loaded
 
     def test_scorer_fails_fast_without_models(self):
         """Test FENICE scorer fails immediately when models can't be loaded."""
@@ -33,8 +33,8 @@ class TestFENICEScorer:
         source = "John Smith works at Microsoft."
         summary = "John Smith is at Microsoft."
         
-        # Should fail fast when trying to load models
-        with pytest.raises((OSError, ModuleNotFoundError, ImportError)):
+        # Should fail fast when trying to load FENICE models (network or dependency issue)
+        with pytest.raises((OSError, ModuleNotFoundError, ImportError, RuntimeError)):
             scorer.evaluate(source, summary)
 
     def test_empty_input_validation(self):
@@ -56,21 +56,19 @@ class TestFENICEScorer:
         summaries = ["Summary 1", "Summary 2"]
         
         # Should fail fast when trying to process
-        with pytest.raises((OSError, ModuleNotFoundError, ImportError)):
+        with pytest.raises((OSError, ModuleNotFoundError, ImportError, RuntimeError)):
             scorer.batch_evaluate(sources, summaries)
 
     def test_claim_extraction_fallback_removed(self):
-        """Test that claim extraction no longer has fallback."""
+        """Test that FENICE now uses the real package instead of fallbacks."""
         scorer = create_fenice_scorer()
         
-        # Test simple sentence splitting still works as basic functionality
-        summary = "John Smith works at Microsoft. The company has 1000 employees. They are based in Seattle."
-        claims = scorer._simple_sentence_split(summary)
+        # The old _simple_sentence_split method should no longer exist
+        assert not hasattr(scorer, '_simple_sentence_split')
         
-        assert len(claims) == 3
-        assert "John Smith works at Microsoft" in claims
-        assert "The company has 1000 employees" in claims
-        assert "They are based in Seattle" in claims
+        # The scorer should use the real FENICE package
+        assert hasattr(scorer, '_fenice_model')
+        assert hasattr(scorer, '_load_model')
 
 
 class TestCombinedRewardSystem:
@@ -115,7 +113,7 @@ class TestCombinedRewardSystem:
         summary = "John Smith is at Microsoft which has 1000 workers."
         
         # Should fail fast when FENICE scorer fails
-        with pytest.raises((OSError, ModuleNotFoundError, ImportError)):
+        with pytest.raises((OSError, ModuleNotFoundError, ImportError, RuntimeError)):
             system.evaluate(source, summary)
 
     def test_batch_evaluation_fails_fast(self):
@@ -126,7 +124,7 @@ class TestCombinedRewardSystem:
         summaries = ["Summary 1", "Summary 2"]
         
         # Should fail fast when FENICE scorer fails
-        with pytest.raises((OSError, ModuleNotFoundError, ImportError)):
+        with pytest.raises((OSError, ModuleNotFoundError, ImportError, RuntimeError)):
             system.evaluate_batch(sources, summaries)
 
     def test_weight_update(self):

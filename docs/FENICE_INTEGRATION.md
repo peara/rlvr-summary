@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the integration of the distilled FENICE Factual Consistency Scorer into the RLVR-Summary reward system. FENICE provides factual consistency evaluation through claim extraction and Natural Language Inference (NLI) scoring.
+This document describes the integration of the FENICE Factual Consistency Scorer package into the RLVR-Summary reward system. FENICE provides factual consistency evaluation through claim extraction and Natural Language Inference (NLI) scoring using the official FENICE Python package from Babelscape.
 
 ## Architecture
 
@@ -21,9 +21,9 @@ R = fenice_weight × FENICE_score + rule_weight × Rules_score
 ### Components
 
 1. **FENICE Scorer** (`src/rlvr_summary/rewards/fenice.py`)
-   - Claim extraction from summaries
-   - NLI-based factual consistency scoring
-   - Graceful fallback when models unavailable
+   - Uses the official FENICE Python package (`pip install FENICE`)
+   - Claim extraction and NLI-based factual consistency scoring
+   - Fail-fast behavior for research environments
 
 2. **Combined Reward System** (`src/rlvr_summary/rewards/combined.py`)
    - Weighted combination of FENICE and rule-based scores
@@ -33,6 +33,16 @@ R = fenice_weight × FENICE_score + rule_weight × Rules_score
 3. **Enhanced Integration** (`src/rlvr_summary/rewards/integration.py`)
    - Support for both combined and rule-only modes
    - W&B logging with FENICE metrics
+
+## Installation
+
+Before using FENICE, ensure the package is installed:
+
+```bash
+pip install FENICE
+```
+
+The FENICE package includes all necessary dependencies for claim extraction and NLI-based factual consistency scoring.
 
 ## Usage
 
@@ -114,8 +124,6 @@ fenice_weight: 0.7
 rule_weight: 0.3
 
 fenice_config:
-  enabled: true
-  model_name: "Babelscape/FENICE"
   threshold: 0.5
   batch_size: 8
 
