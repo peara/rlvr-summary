@@ -11,7 +11,7 @@ def test_fenice_direct():
     """Test the FENICE package directly."""
     print("Testing FENICE package directly...")
     try:
-        from metric.FENICE import FENICE
+        from rlvr_summary.vendor.fenice import FENICE
         fenice = FENICE()
         
         document = '''Simone Biles made a triumphant return to the Olympic stage at the Paris 2024 Games, competing in the women's gymnastics qualifications. She showed excellent form on all apparatus.'''

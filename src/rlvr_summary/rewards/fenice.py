@@ -43,14 +43,14 @@ class FENICEScorer(BaseRule):
             return
             
         try:
-            from metric.FENICE import FENICE
+            from rlvr_summary.vendor.fenice import FENICE
             self.logger.info("Loading FENICE model...")
             self._fenice_model = FENICE()
             self._model_loaded = True
             self.logger.info("FENICE model loaded successfully")
         except ImportError as e:
             raise ImportError(
-                "FENICE package not found. Please install it with: pip install FENICE"
+                "FENICE package not found. Please check the vendor installation."
             ) from e
         except Exception as e:
             raise RuntimeError(f"Failed to load FENICE model: {e}") from e

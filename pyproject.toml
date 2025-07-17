@@ -42,6 +42,8 @@ dependencies = [
     
     # NLP utilities
     "spacy>=3.7.0",
+    "fastcoref>=2.1.6",
+    "sentencepiece>=0.2.0",
     "rank-bm25>=0.2.2",
     
     # Data handling
