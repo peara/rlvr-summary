@@ -1,0 +1,1 @@
+"""Vendor package for third-party code integrated into rlvr-summary."""

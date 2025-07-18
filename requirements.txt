@@ -56,7 +56,6 @@ email_validator==2.2.0
 et_xmlfile==2.0.0
 evaluate==0.4.3
 exceptiongroup==1.2.2
-FENICE
 executing==2.2.0
 fastapi==0.115.11
 fastapi-cli==0.0.7
