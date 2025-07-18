@@ -2,7 +2,8 @@ from typing import List
 
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5Tokenizer
-from ..utils.utils import chunks, split_into_sentences, distinct
+
+from ..utils.utils import chunks, distinct, split_into_sentences
 
 
 class ClaimExtractor:

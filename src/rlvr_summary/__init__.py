@@ -17,3 +17,6 @@ __email__ = "team@rlvr-summary.com"
 # from .training import *
 # from .rewards import *
 # from .tools import *
+
+# Integrated modules are imported lazily to avoid dependency issues
+# from . import fenice

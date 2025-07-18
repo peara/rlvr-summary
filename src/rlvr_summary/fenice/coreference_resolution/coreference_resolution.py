@@ -1,4 +1,5 @@
 from typing import List, Tuple
+
 from fastcoref import FCoref
 from tqdm import tqdm
 

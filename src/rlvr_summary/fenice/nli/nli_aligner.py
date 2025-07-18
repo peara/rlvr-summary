@@ -1,6 +1,7 @@
-from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
+from tqdm import tqdm
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
 from ..utils.utils import chunks
 
 

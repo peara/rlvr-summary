@@ -1,7 +1,9 @@
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 import numpy as np
 import torch
 from tqdm import tqdm
+
 from .claim_extractor.claim_extractor import ClaimExtractor
 from .coreference_resolution.coreference_resolution import CoreferenceResolution
 from .nli.nli_aligner import NLIAligner
@@ -286,7 +288,6 @@ class FENICE:
         alignment_prefix: Optional[str] = None,
         k_chars: int = 100,
     ):
-
         id = f"{sample_id}-{premise_id}-{hypothesis_id}-{premise[:k_chars]}"
         if alignment_prefix is not None:
             id = f"{alignment_prefix}{id}"

@@ -1,9 +1,10 @@
 import hashlib
-import pickle
-from typing import List, Tuple, Union
-import spacy
-import sys
 import os
+import pickle
+import sys
+from typing import List, Tuple, Union
+
+import spacy
 from spacy.cli import download
 from tqdm import tqdm
 

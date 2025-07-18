@@ -7,7 +7,7 @@ max_samples: null  # null means use all samples
 cache_dir: "./data/cache"
 
 # Data preprocessing
-max_input_length: 1024
+max_input_length: 2048
 max_target_length: 128
 min_input_length: 50
 min_target_length: 5

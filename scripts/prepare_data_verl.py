@@ -63,14 +63,14 @@ def prepare_rlvr_dataset(
     )
 
     preprocessor = TextPreprocessor(
-        max_length=data_config.get("max_article_length", 10000),
+        max_length=data_config.get("max_input_length", 2048),
     )
 
     validator = DataValidator(
-        min_article_length=data_config.get("min_article_length", 50),
-        max_article_length=data_config.get("max_article_length", 10000),
-        min_summary_length=data_config.get("min_summary_length", 10),
-        max_summary_length=data_config.get("max_summary_length", 500),
+        min_article_length=data_config.get("min_input_length", 50),
+        max_article_length=data_config.get("max_input_length", 2048),
+        min_summary_length=data_config.get("min_target_length", 10),
+        max_summary_length=data_config.get("max_target_length", 500),
     )
 
     batch_processor = BatchProcessor(
