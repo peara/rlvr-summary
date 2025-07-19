@@ -8,7 +8,7 @@ from typing import Optional
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from .integration import create_reward_function
+from rlvr_summary.rewards.integration import create_reward_function
 
 # Create the reward function once at module level for efficiency
 _config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"

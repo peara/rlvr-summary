@@ -167,6 +167,18 @@ class FENICEScorer(BaseRule):
             self.logger.error(f"FENICE batch evaluation failed: {e}")
             raise RuntimeError(f"FENICE batch evaluation failed: {e}") from e
 
+    def clear_model_cache(self):
+        """Clear cached models to free memory."""
+        if self._fenice_model is not None:
+            self._fenice_model.clear_model_cache()
+            self.logger.info("FENICE model cache cleared")
+
+    def get_model_info(self):
+        """Get information about loaded models."""
+        if self._fenice_model is not None:
+            return self._fenice_model.get_model_info()
+        return {"models_loaded": False}
+
 
 def create_fenice_scorer(weight: float = 1.0, threshold: float = 0.5) -> FENICEScorer:
     """Create a FENICE scorer with default configuration.

@@ -19,9 +19,9 @@ import sys
 from pathlib import Path
 from typing import Dict
 
+import datasets
 import pandas as pd
 from omegaconf import OmegaConf
-import datasets
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -99,24 +99,19 @@ def prepare_rlvr_dataset(
         verl_data.append(
             {
                 "data_source": "cnn_dailymail",  # Used by reward function to select scoring method
-                "prompt": [
-                    {
-                        "role": "user",
-                        "content": prompt_content
-                    }
-                ],
+                "prompt": [{"role": "user", "content": prompt_content}],
                 "ability": "summarization",  # Task category
                 "reward_model": {
                     "style": "rule",  # Using rule-based reward
                     "ground_truth": processed_item.get(
                         "highlights", processed_item.get("summary", "")
-                    )
+                    ),
                 },
                 "extra_info": {
                     "split": split,
                     "index": idx,
                     "id": processed_item.get("id", ""),
-                }
+                },
             }
         )
 
@@ -162,7 +157,9 @@ def prepare_rlvr_dataset(
         print(f"Ability: {sample['ability']}")
         print(f"Prompt: {sample['prompt']}")
         print(f"Reward Model Style: {sample['reward_model']['style']}")
-        print(f"Ground Truth (first 100 chars): {sample['reward_model']['ground_truth'][:100]}...")
+        print(
+            f"Ground Truth (first 100 chars): {sample['reward_model']['ground_truth'][:100]}..."
+        )
         print(f"Extra Info: {sample['extra_info']}")
         print(f"{'='*60}\n")
 
@@ -172,46 +169,54 @@ def prepare_rlvr_dataset(
 def validate_verl_format(data_sample: Dict) -> bool:
     """
     Validate that a data sample follows the VERL format requirements.
-    
+
     Args:
         data_sample: Single data sample to validate
-        
+
     Returns:
         True if valid, raises ValueError if invalid
     """
     required_fields = ["data_source", "prompt", "ability", "reward_model", "extra_info"]
-    
+
     # Check all required fields exist
     for field in required_fields:
         if field not in data_sample:
             raise ValueError(f"Missing required field: {field}")
-    
+
     # Validate prompt format (should be list of chat messages)
     prompt = data_sample["prompt"]
     if not isinstance(prompt, list):
         raise ValueError(f"'prompt' must be a list, got {type(prompt)}")
-    
+
     for message in prompt:
         if not isinstance(message, dict):
             raise ValueError(f"Prompt messages must be dicts, got {type(message)}")
         if "role" not in message or "content" not in message:
-            raise ValueError("Each prompt message must have 'role' and 'content' fields")
-    
+            raise ValueError(
+                "Each prompt message must have 'role' and 'content' fields"
+            )
+
     # Validate reward_model format
     reward_model = data_sample["reward_model"]
     if not isinstance(reward_model, dict):
         raise ValueError(f"'reward_model' must be a dict, got {type(reward_model)}")
     if "style" not in reward_model or "ground_truth" not in reward_model:
         raise ValueError("'reward_model' must have 'style' and 'ground_truth' fields")
-    
+
     # Validate other fields are strings/dicts as expected
     if not isinstance(data_sample["data_source"], str):
-        raise ValueError(f"'data_source' must be a string, got {type(data_sample['data_source'])}")
+        raise ValueError(
+            f"'data_source' must be a string, got {type(data_sample['data_source'])}"
+        )
     if not isinstance(data_sample["ability"], str):
-        raise ValueError(f"'ability' must be a string, got {type(data_sample['ability'])}")
+        raise ValueError(
+            f"'ability' must be a string, got {type(data_sample['ability'])}"
+        )
     if not isinstance(data_sample["extra_info"], dict):
-        raise ValueError(f"'extra_info' must be a dict, got {type(data_sample['extra_info'])}")
-    
+        raise ValueError(
+            f"'extra_info' must be a dict, got {type(data_sample['extra_info'])}"
+        )
+
     return True
 
 

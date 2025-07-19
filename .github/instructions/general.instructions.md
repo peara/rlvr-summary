@@ -13,3 +13,10 @@ What we are researching:
 - Using VERL as Reinforcement Learning framework
 - Using Rule to calculate format, style, and other scores
 - Using FENICE to calculate factuallity score
+
+Project structure:
+- main package is in `src/rlvr_summary`
+- tests are in `tests`
+- configs are in `configs`
+- docs are in `docs`
+- scripts are in `scripts` with each experiment is in 1 script

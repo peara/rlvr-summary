@@ -4,9 +4,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from .claim_extractor.claim_extractor import ClaimExtractor
-from .coreference_resolution.coreference_resolution import CoreferenceResolution
-from .nli.nli_aligner import NLIAligner
+from .model_manager import model_manager
 from .utils.utils import split_into_paragraphs, split_into_sentences_batched
 
 
@@ -37,11 +35,17 @@ class FENICE:
         self.use_coref = use_coref
         self.doc_level_nli = doc_level_nli
         self.paragraph_level_nli = paragraph_level_nli
-        self.coref_model = (
-            CoreferenceResolution(load_model=False) if use_coref else None
-        )
+        # Remove individual model loading - use model manager instead
         self.nli_max_length = nli_max_length
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def clear_model_cache(self):
+        """Clear cached models to free memory if needed."""
+        model_manager.clear_cache()
+
+    def get_model_info(self):
+        """Get information about loaded models."""
+        return model_manager.get_memory_info()
 
     def _score(self, sample_id: int, document: str, summary: str):
         doc_id = self.get_id(sample_id, document)
@@ -70,8 +74,13 @@ class FENICE:
             coref_alignment = None
             if self.use_coref:
                 coref_clusters = self.coref_clusters_cache[doc_id]
+                # Get coreference model from manager
+                coref_model = model_manager.get_coref_model(
+                    batch_size=self.coreference_batch_size, 
+                    device=self.device
+                )
                 # modified versions of {aligned_sentence} obtained through coreference resolution
-                coref_premises = self.coref_model.get_coref_versions(
+                coref_premises = coref_model.get_coref_versions(
                     sentence=sentence_level_alignment["source_passage"],
                     text=document,
                     sentences=sentences,
@@ -164,7 +173,7 @@ class FENICE:
         ):
             predictions.append(self._score(sample_id, doc, summary))
 
-        del self.nli_aligner
+        # Don't delete the NLI aligner - keep it cached for reuse
         torch.cuda.empty_cache()
 
         return predictions
@@ -198,32 +207,32 @@ class FENICE:
 
     # cache claim extraction outputs
     def cache_claims(self, summaries):
-        claim_extractor = ClaimExtractor(
+        claim_extractor = model_manager.get_claim_extractor(
             batch_size=self.claim_extractor_batch_size, device=self.device
         )
         claims_predictions = claim_extractor.process_batch(summaries)
         for summ_id, claims in enumerate(claims_predictions):
             id = self.get_id(summ_id, summaries[summ_id])
             self.claims_cache[id] = claims
-        del claim_extractor
+        # Don't delete - keep models cached for reuse
         torch.cuda.empty_cache()
 
     # cache coreference resolution outputs
     def cache_coref(self, documents):
-        coref_model = CoreferenceResolution(
+        coref_model = model_manager.get_coref_model(
             batch_size=self.coreference_batch_size, device=self.device
         )
         all_clusters = coref_model.get_clusters_batch(documents)
         for doc_id, clusters in enumerate(all_clusters):
             id = self.get_id(doc_id, documents[doc_id])
             self.coref_clusters_cache[id] = clusters
-        del coref_model.model
+        # Don't delete - keep models cached for reuse
         torch.cuda.empty_cache()
 
     def cache_alignments(self, documents: List[str], summaries: List[str]):
         alignments_ids, all_pairs = [], []
         alignment_ids_doc, all_pairs_doc = [], []
-        self.nli_aligner = NLIAligner(
+        self.nli_aligner = model_manager.get_nli_aligner(
             batch_size=self.nli_batch_size,
             device=self.device,
             max_length=self.nli_max_length,
