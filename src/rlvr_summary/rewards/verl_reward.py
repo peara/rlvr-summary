@@ -14,6 +14,7 @@ from rlvr_summary.rewards.integration import create_reward_function
 _config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
 _reward_fn = None
 
+
 def _get_reward_function():
     """Get the reward function, creating it if necessary."""
     global _reward_fn
@@ -62,6 +63,3 @@ def compute_score(
 
     # Ensure score is in valid range
     return float(max(0.0, min(1.0, score)))
-
-
-

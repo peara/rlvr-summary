@@ -6,7 +6,7 @@
 FENICE was reloading its neural network models on every evaluation, causing severe performance degradation:
 
 1. **ClaimExtractor (T5-base)**: ~220MB model reloaded each time
-2. **NLIAligner (DeBERTa-v3-large)**: ~1.4GB model reloaded each time  
+2. **NLIAligner (DeBERTa-v3-large)**: ~1.4GB model reloaded each time
 3. **CoreferenceResolution (SpanBERT)**: ~440MB model reloaded each time
 
 **Performance Impact**: Each evaluation took 10-30 seconds instead of milliseconds due to:
@@ -22,7 +22,7 @@ claim_extractor = ClaimExtractor(...)  # NEW MODEL EACH TIME
 claims = claim_extractor.process_batch(summaries)
 del claim_extractor  # DELETED AFTER USE
 
-# In FENICE.cache_coref()  
+# In FENICE.cache_coref()
 coref_model = CoreferenceResolution(...)  # NEW MODEL EACH TIME
 clusters = coref_model.get_clusters_batch(documents)
 del coref_model.model  # DELETED AFTER USE
@@ -42,10 +42,10 @@ We implemented a **Singleton Pattern with Lazy Loading** using a `ModelManager` 
 ```python
 class ModelManager:
     """Singleton manager for FENICE models to prevent reloading."""
-    
+
     _instance = None
     _initialized = False
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
@@ -86,20 +86,20 @@ class ModelManager:
 def get_claim_extractor(self, batch_size: int = 256, device: str = None):
     """Get or create claim extractor model."""
     config = (batch_size, device)
-    
+
     # Check if we need to create/recreate the model
-    if (self._claim_extractor is None or 
+    if (self._claim_extractor is None or
         self._claim_extractor_config != config):
-        
+
         # Clean up old model if exists
         if self._claim_extractor is not None:
             del self._claim_extractor
             torch.cuda.empty_cache()
-        
+
         # Create new model
         self._claim_extractor = ClaimExtractor(batch_size=batch_size, device=device)
         self._claim_extractor_config = config
-    
+
     return self._claim_extractor
 ```
 
@@ -184,7 +184,7 @@ claim_extractor = model_manager.get_claim_extractor(
 
 nli_aligner = model_manager.get_nli_aligner(
     batch_size=16,    # Different batch size
-    device="cpu",     # Different device  
+    device="cpu",     # Different device
     max_length=512    # Different max length
 )
 ```
@@ -212,7 +212,7 @@ fenice = FENICE(
 ### ✅ Validation Results
 
 - [x] Models loaded once per configuration
-- [x] Models reused across evaluations  
+- [x] Models reused across evaluations
 - [x] Significant performance improvement
 - [x] Memory usage optimized
 - [x] Backward compatibility maintained
@@ -250,7 +250,7 @@ model_manager.clear_cache()       # Global cache clear
 ### 🎯 Best Practices
 
 1. **Let models load naturally** - Don't preload unless necessary
-2. **Monitor memory usage** - Check `get_model_info()` periodically  
+2. **Monitor memory usage** - Check `get_model_info()` periodically
 3. **Clear cache between sessions** - Use `clear_model_cache()` when switching tasks
 4. **Use appropriate batch sizes** - Balance speed vs memory usage
 
