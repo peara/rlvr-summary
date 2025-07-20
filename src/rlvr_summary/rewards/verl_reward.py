@@ -9,6 +9,7 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from rlvr_summary.rewards.integration import create_reward_function
+from rlvr_summary.rewards.fenice import set_fenice_document_cache
 
 # Create the reward function once at module level for efficiency
 _config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
@@ -40,7 +41,7 @@ def compute_score(
         data_source: Name of the dataset (e.g., "cnn_dailymail")
         solution_str: Generated summary text
         ground_truth: Reference summary or original article text
-        extra_info: Additional information (optional, currently unused)
+        extra_info: Additional information including potential FENICE document cache
 
     Returns:
         float: Reward score between 0 and 1
@@ -57,9 +58,19 @@ def compute_score(
     # For summarization tasks, we typically want to use the original article as source
     source_text = ground_truth if ground_truth else ""
 
+    # Check for FENICE document cache in extra_info and set it if available
+    if extra_info and isinstance(extra_info, dict):
+        fenice_cache = extra_info.get('fenice_document_cache')
+        if fenice_cache:
+            set_fenice_document_cache(fenice_cache)
+    
     # Use the unified reward function
     reward_fn = _get_reward_function()
     score = reward_fn(source_text, solution_str)
+    
+    # Clear the cache after use to avoid memory leaks
+    if extra_info and isinstance(extra_info, dict) and extra_info.get('fenice_document_cache'):
+        set_fenice_document_cache(None)
 
     # Ensure score is in valid range
     return float(max(0.0, min(1.0, score)))

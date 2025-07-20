@@ -1,9 +1,23 @@
 """FENICE Factual Consistency Scorer for reward system."""
 
 import logging
+import threading
 from typing import Any, Dict, List, Optional
 
 from .base import BaseRule
+
+# Thread-local storage for FENICE document cache
+_thread_local_cache = threading.local()
+
+
+def set_fenice_document_cache(cache_data: Optional[Dict]) -> None:
+    """Set FENICE document cache for the current thread."""
+    _thread_local_cache.fenice_cache = cache_data
+
+
+def get_fenice_document_cache() -> Optional[Dict]:
+    """Get FENICE document cache for the current thread."""
+    return getattr(_thread_local_cache, 'fenice_cache', None)
 
 
 class FENICEScorer(BaseRule):
@@ -78,8 +92,16 @@ class FENICEScorer(BaseRule):
         batch = [{"document": source, "summary": summary}]
 
         try:
-            # Get FENICE results
-            results = self._fenice_model.score_batch(batch)
+            # Check for cached document data
+            cached_data = get_fenice_document_cache()
+            
+            # Get FENICE results with or without cache
+            if cached_data:
+                self.logger.debug("Using cached document data for FENICE evaluation")
+                results = self._fenice_model.score_batch(batch, document_cache_data=cached_data)
+            else:
+                results = self._fenice_model.score_batch(batch)
+                
             fenice_result = results[0]  # Single item in batch
 
             # Extract score and alignments
@@ -137,8 +159,15 @@ class FENICEScorer(BaseRule):
         ]
 
         try:
-            # Get FENICE results for entire batch
-            fenice_results = self._fenice_model.score_batch(batch)
+            # Check for cached document data
+            cached_data = get_fenice_document_cache()
+            
+            # Get FENICE results for entire batch with or without cache
+            if cached_data:
+                self.logger.debug(f"Using cached document data for FENICE batch evaluation of {len(batch)} items")
+                fenice_results = self._fenice_model.score_batch(batch, document_cache_data=cached_data)
+            else:
+                fenice_results = self._fenice_model.score_batch(batch)
 
             # Convert to expected format
             results = []
