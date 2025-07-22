@@ -101,6 +101,7 @@ class RewardSystemIntegrator:
         summary: str,
         log_details: bool = False,
         step: Optional[int] = None,
+        context: Optional[Dict] = None,
     ) -> float:
         """Compute reward for a single source-summary pair.
 
@@ -109,11 +110,12 @@ class RewardSystemIntegrator:
             summary: Generated summary
             log_details: Whether to log detailed evaluation
             step: Optional training step for logging
+            context: Optional context data (e.g., cache data for specific rules)
 
         Returns:
             Total reward score (0.0 to 1.0)
         """
-        result = self.reward_system.evaluate(source, summary, log_details=log_details)
+        result = self.reward_system.evaluate(source, summary, log_details=log_details, context=context)
 
         # Result is always a RuleEvaluationResult from the unified system
         total_score = result.total_score

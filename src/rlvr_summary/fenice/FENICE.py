@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+import logging
 
 import numpy as np
 import torch
@@ -161,10 +162,11 @@ class FENICE:
             alignment, _ = loaded_alignment
         return alignment
 
-    def score_batch(self, batch: List[Dict[str, str]]) -> List[Dict]:
+    def score_batch(self, batch: List[Dict[str, str]], document_cache_data=None) -> List[Dict]:
+        """Score a batch of document-summary pairs, using pre-cached data when available."""
         documents = [el["document"] for el in batch]
         summaries = [el["summary"] for el in batch]
-        self.cache(documents, summaries)
+        self.cache(documents, summaries, document_cache_data)
         predictions = []
         for sample_id, (doc, summary) in tqdm(
             enumerate(zip(documents, summaries)),
@@ -178,20 +180,45 @@ class FENICE:
 
         return predictions
 
-    def cache(self, documents, summaries):
-        self.cache_sentences(documents)
+    def cache(self, documents, summaries, document_cache_data=None):
+        """Cache document and summary data, using pre-cached data when available."""
+        self.cache_sentences(documents, document_cache_data)
         if self.use_coref:
-            self.cache_coref(documents)
+            self.cache_coref(documents, document_cache_data)
         self.cache_claims(summaries)
         self.cache_alignments(documents, summaries)
 
-    def cache_sentences(self, documents):
-        all_sentences = split_into_sentences_batched(
-            documents, batch_size=512, return_offsets=True
-        )
-        for i, sentences in enumerate(all_sentences):
-            id = self.get_id(i, documents[i])
-            self.sentences_cache[id] = sentences
+    def cache_sentences(self, documents, document_cache_data=None):
+        """Cache sentences, using pre-cached data when available."""
+        if document_cache_data:
+            # Use pre-cached sentence data
+            logger = logging.getLogger(__name__)
+            logger.info("Using pre-cached sentence data from document cache")
+            
+            for i, doc in enumerate(documents):
+                doc_id = self.get_id(i, doc)
+                
+                # Look for cached data for this document
+                if i in document_cache_data:
+                    cached_doc = document_cache_data[i]
+                    if 'sentences' in cached_doc:
+                        self.sentences_cache[doc_id] = cached_doc['sentences']
+                        continue
+                
+                # Fallback to runtime computation if cache missing
+                logger.warning(f"No cached sentences for document {i}, computing at runtime")
+                doc_sentences = split_into_sentences_batched(
+                    [doc], batch_size=512, return_offsets=True
+                )[0]
+                self.sentences_cache[doc_id] = doc_sentences
+        else:
+            # Original behavior - compute sentences at runtime
+            all_sentences = split_into_sentences_batched(
+                documents, batch_size=512, return_offsets=True
+            )
+            for i, sentences in enumerate(all_sentences):
+                id = self.get_id(i, documents[i])
+                self.sentences_cache[id] = sentences
 
     def get_docs_to_process(self, documents, cache):
         ids = [doc_id for doc_id in range(len(documents))]
@@ -218,14 +245,49 @@ class FENICE:
         torch.cuda.empty_cache()
 
     # cache coreference resolution outputs
-    def cache_coref(self, documents):
-        coref_model = model_manager.get_coref_model(
-            batch_size=self.coreference_batch_size, device=self.device
-        )
-        all_clusters = coref_model.get_clusters_batch(documents)
-        for doc_id, clusters in enumerate(all_clusters):
-            id = self.get_id(doc_id, documents[doc_id])
-            self.coref_clusters_cache[id] = clusters
+    def cache_coref(self, documents, document_cache_data=None):
+        """Cache coreference resolution, using pre-cached data when available."""
+        if document_cache_data:
+            # Use pre-cached coreference data
+            logger = logging.getLogger(__name__)
+            logger.info("Checking for pre-cached coreference data")
+            
+            docs_to_process = []
+            docs_indices = []
+            
+            for i, doc in enumerate(documents):
+                doc_id = self.get_id(i, doc)
+                
+                # Check if we have cached coreference data
+                if i in document_cache_data:
+                    cached_doc = document_cache_data[i]
+                    if 'coref_clusters' in cached_doc:
+                        self.coref_clusters_cache[doc_id] = cached_doc['coref_clusters']
+                        continue
+                
+                # Need to compute for this document
+                docs_to_process.append(doc)
+                docs_indices.append(i)
+            
+            if docs_to_process:
+                logger.info(f"Computing coreference for {len(docs_to_process)} documents at runtime")
+                coref_model = model_manager.get_coref_model(
+                    batch_size=self.coreference_batch_size, device=self.device
+                )
+                clusters_batch = coref_model.get_clusters_batch(docs_to_process)
+                
+                for idx, clusters in zip(docs_indices, clusters_batch):
+                    doc_id = self.get_id(idx, documents[idx])
+                    self.coref_clusters_cache[doc_id] = clusters
+        else:
+            # Original behavior - compute all at runtime
+            coref_model = model_manager.get_coref_model(
+                batch_size=self.coreference_batch_size, device=self.device
+            )
+            all_clusters = coref_model.get_clusters_batch(documents)
+            for doc_id, clusters in enumerate(all_clusters):
+                id = self.get_id(doc_id, documents[doc_id])
+                self.coref_clusters_cache[id] = clusters
         # Don't delete - keep models cached for reuse
         torch.cuda.empty_cache()
 
