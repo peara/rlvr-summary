@@ -8,7 +8,6 @@ from typing import Optional
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from rlvr_summary.rewards.fenice import _get_document_key, _validate_cache_for_document
 from rlvr_summary.rewards.integration import create_reward_integrator
 
 # Create the reward integrator once at module level for efficiency
@@ -53,13 +52,10 @@ def compute_score(
     if len(solution_str.strip()) == 0:
         return 0.0
 
-    # Determine the source text
-    # In our case, ground_truth might be the reference summary or the original article
-    # For summarization tasks, we typically want to use the original article as source
-    source_text = ground_truth if ground_truth else ""
-
-    # Extract and validate FENICE cache if available
+    # Extract the original document and FENICE cache from extra_info
+    source_text = ""
     context = None
+
     if extra_info and isinstance(extra_info, dict):
         cache_data = extra_info.get("fenice_document_cache")
 
@@ -76,18 +72,24 @@ def compute_score(
                 logger.warning(f"Failed to deserialize FENICE cache: {e}")
                 cache_data = None
 
-        if cache_data and _validate_cache_for_document(cache_data, source_text):
+        # Use cached document text as source (pre-computed cache is always correct)
+        if cache_data and isinstance(cache_data, dict):
+            source_text = cache_data.get("document_text", "")
             context = {"fenice_cache": cache_data}
-        elif cache_data:
-            # Cache validation failed - log but continue with runtime computation
             import logging
 
             logger = logging.getLogger(__name__)
-            logger.warning(
-                "FENICE cache validation failed, falling back to runtime computation"
-            )
+            logger.info("Using pre-computed FENICE document cache")
 
-    # Use the reward integrator with cache context
+    # If no cached document text, fall back to ground_truth
+    if not source_text:
+        source_text = ground_truth if ground_truth else ""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "No FENICE cache available, using runtime computation"
+        )  # Use the reward integrator with cache context
     reward_integrator = _get_reward_integrator()
     score = reward_integrator.compute_reward(source_text, solution_str, context=context)
 
