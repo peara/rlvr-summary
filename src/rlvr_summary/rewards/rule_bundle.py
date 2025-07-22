@@ -106,7 +106,7 @@ class RuleBundleRewardSystem:
                 )
 
     def evaluate(
-        self, source: str, summary: str, log_details: bool = False
+        self, source: str, summary: str, log_details: bool = False, context: Optional[Dict] = None
     ) -> RuleEvaluationResult:
         """Evaluate a summary using all configured rules.
 
@@ -114,6 +114,7 @@ class RuleBundleRewardSystem:
             source: Original text
             summary: Generated summary
             log_details: Whether to log detailed evaluation results
+            context: Optional context data (e.g., cache data for specific rules)
 
         Returns:
             RuleEvaluationResult containing scores and metrics
@@ -135,7 +136,14 @@ class RuleBundleRewardSystem:
         # Evaluate each rule
         for rule_name, rule in self.rules.items():
             try:
-                result = rule.evaluate(source, summary)
+                # Check if rule supports context (e.g., cache data)
+                if hasattr(rule, 'evaluate_with_context') and context:
+                    # Rule supports context - pass it along
+                    result = rule.evaluate_with_context(source, summary, context)
+                else:
+                    # Standard evaluation
+                    result = rule.evaluate(source, summary)
+                    
                 rule_scores[rule_name] = result["score"]
                 rule_details[rule_name] = result["details"]
                 rule_passed[rule_name] = result["passed"]
@@ -189,7 +197,7 @@ class RuleBundleRewardSystem:
         return result
 
     def evaluate_batch(
-        self, sources: List[str], summaries: List[str], log_details: bool = False
+        self, sources: List[str], summaries: List[str], log_details: bool = False, context: Optional[Dict] = None
     ) -> List[RuleEvaluationResult]:
         """Evaluate a batch of summaries.
 
@@ -197,6 +205,7 @@ class RuleBundleRewardSystem:
             sources: List of original texts
             summaries: List of generated summaries
             log_details: Whether to log detailed evaluation results
+            context: Optional context data (e.g., cache data for specific rules)
 
         Returns:
             List of RuleEvaluationResult objects
@@ -211,7 +220,12 @@ class RuleBundleRewardSystem:
             if log_details and i % 10 == 0:
                 self.logger.info(f"Processing batch item {i+1}/{len(sources)}")
 
-            result = self.evaluate(source, summary, log_details=False)
+            # Extract per-item context if available
+            item_context = None
+            if context and isinstance(context, dict):
+                item_context = context.get(i)
+
+            result = self.evaluate(source, summary, log_details=False, context=item_context)
             results.append(result)
 
         if log_details:

@@ -8,21 +8,21 @@ from typing import Optional
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from rlvr_summary.rewards.integration import create_reward_function
-from rlvr_summary.rewards.fenice import set_fenice_document_cache
+from rlvr_summary.rewards.integration import create_reward_integrator
+from rlvr_summary.rewards.fenice import _validate_cache_for_document, _get_document_key
 
-# Create the reward function once at module level for efficiency
+# Create the reward integrator once at module level for efficiency
 _config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
-_reward_fn = None
+_reward_integrator = None
 
 
-def _get_reward_function():
-    """Get the reward function, creating it if necessary."""
-    global _reward_fn
-    if _reward_fn is None:
+def _get_reward_integrator():
+    """Get the reward integrator, creating it if necessary."""
+    global _reward_integrator
+    if _reward_integrator is None:
         # Use rule-based system with FENICE included as a weighted rule
-        _reward_fn = create_reward_function(config_path=str(_config_path))
-    return _reward_fn
+        _reward_integrator = create_reward_integrator(config_path=str(_config_path))
+    return _reward_integrator
 
 
 def compute_score(
@@ -58,19 +58,21 @@ def compute_score(
     # For summarization tasks, we typically want to use the original article as source
     source_text = ground_truth if ground_truth else ""
 
-    # Check for FENICE document cache in extra_info and set it if available
+    # Extract and validate FENICE cache if available
+    context = None
     if extra_info and isinstance(extra_info, dict):
-        fenice_cache = extra_info.get('fenice_document_cache')
-        if fenice_cache:
-            set_fenice_document_cache(fenice_cache)
+        cache_data = extra_info.get('fenice_document_cache')
+        if cache_data and _validate_cache_for_document(cache_data, source_text):
+            context = {'fenice_cache': cache_data}
+        elif cache_data:
+            # Cache validation failed - log but continue with runtime computation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("FENICE cache validation failed, falling back to runtime computation")
     
-    # Use the unified reward function
-    reward_fn = _get_reward_function()
-    score = reward_fn(source_text, solution_str)
-    
-    # Clear the cache after use to avoid memory leaks
-    if extra_info and isinstance(extra_info, dict) and extra_info.get('fenice_document_cache'):
-        set_fenice_document_cache(None)
+    # Use the reward integrator with cache context
+    reward_integrator = _get_reward_integrator()
+    score = reward_integrator.compute_reward(source_text, solution_str, context=context)
 
     # Ensure score is in valid range
     return float(max(0.0, min(1.0, score)))

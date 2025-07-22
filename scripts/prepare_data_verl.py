@@ -64,6 +64,13 @@ def preprocess_documents_for_fenice(documents: List[str]) -> Dict[str, Dict]:
     logger.info(f"Pre-processing {len(documents)} documents for FENICE caching...")
     
     try:
+        # Import document key generation for validation
+        import hashlib
+        
+        def get_document_key(document: str) -> str:
+            """Generate a stable key for document cache validation."""
+            return hashlib.sha256(document.encode('utf-8')).hexdigest()[:16]
+        
         # Create temporary FENICE instance for processing
         fenice = FENICE(
             use_coref=False,  # Start with just sentence caching for safety
@@ -81,14 +88,15 @@ def preprocess_documents_for_fenice(documents: List[str]) -> Dict[str, Dict]:
         for i, sentences in enumerate(all_sentences):
             doc_id = fenice.get_id(i, documents[i])
             
-            # Store the essential cached data
+            # Store the essential cached data with document key for validation
             document_cache[i] = {
                 'doc_id': doc_id,
+                'document_key': get_document_key(documents[i]),  # Add validation key
                 'sentences': sentences,  # List of (sentence, start_offset, end_offset)
                 'document_text': documents[i],
             }
         
-        logger.info(f"✅ Successfully cached {len(document_cache)} documents")
+        logger.info(f"✅ Successfully cached {len(document_cache)} documents with validation keys")
         return document_cache
         
     except Exception as e:

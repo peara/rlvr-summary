@@ -1,23 +1,27 @@
 """FENICE Factual Consistency Scorer for reward system."""
 
+import hashlib
 import logging
-import threading
 from typing import Any, Dict, List, Optional
 
 from .base import BaseRule
 
-# Thread-local storage for FENICE document cache
-_thread_local_cache = threading.local()
+
+def _get_document_key(document: str) -> str:
+    """Generate a stable key for document cache validation."""
+    return hashlib.sha256(document.encode('utf-8')).hexdigest()[:16]
 
 
-def set_fenice_document_cache(cache_data: Optional[Dict]) -> None:
-    """Set FENICE document cache for the current thread."""
-    _thread_local_cache.fenice_cache = cache_data
-
-
-def get_fenice_document_cache() -> Optional[Dict]:
-    """Get FENICE document cache for the current thread."""
-    return getattr(_thread_local_cache, 'fenice_cache', None)
+def _validate_cache_for_document(cache_data: Dict, document: str) -> bool:
+    """Validate that cache data matches the given document."""
+    if not cache_data or not isinstance(cache_data, dict):
+        return False
+    
+    # Check if cache has document_key for validation
+    expected_key = _get_document_key(document)
+    cached_key = cache_data.get('document_key')
+    
+    return cached_key == expected_key
 
 
 class FENICEScorer(BaseRule):
@@ -70,12 +74,31 @@ class FENICEScorer(BaseRule):
         except Exception as e:
             raise RuntimeError(f"Failed to load FENICE model: {e}") from e
 
-    def evaluate(self, source: str, summary: str) -> Dict[str, Any]:
+    def evaluate_with_context(self, source: str, summary: str, context: Dict) -> Dict[str, Any]:
+        """Evaluate factual consistency with context data (e.g., cache).
+
+        Args:
+            source: Original text
+            summary: Generated summary
+            context: Context data including potential FENICE cache
+
+        Returns:
+            Dictionary containing:
+                - score: Factual consistency score (0.0 to 1.0)
+                - details: Detailed evaluation results
+                - passed: Whether the score meets threshold
+        """
+        # Extract cache data from context if available
+        cache_data = context.get('fenice_cache') if context else None
+        return self.evaluate(source, summary, cache_data=cache_data)
+
+    def evaluate(self, source: str, summary: str, cache_data: Optional[Dict] = None) -> Dict[str, Any]:
         """Evaluate factual consistency of summary against source.
 
         Args:
             source: Original text
             summary: Generated summary
+            cache_data: Optional pre-computed document cache data
 
         Returns:
             Dictionary containing:
@@ -92,13 +115,18 @@ class FENICEScorer(BaseRule):
         batch = [{"document": source, "summary": summary}]
 
         try:
-            # Check for cached document data
-            cached_data = get_fenice_document_cache()
+            # Validate cache data if provided
+            validated_cache = None
+            if cache_data and _validate_cache_for_document(cache_data, source):
+                self.logger.debug("Using validated cached document data for FENICE evaluation")
+                # Convert single document cache to batch format expected by FENICE
+                validated_cache = {0: cache_data}
+            elif cache_data:
+                self.logger.warning("Cache data validation failed, falling back to runtime computation")
             
             # Get FENICE results with or without cache
-            if cached_data:
-                self.logger.debug("Using cached document data for FENICE evaluation")
-                results = self._fenice_model.score_batch(batch, document_cache_data=cached_data)
+            if validated_cache:
+                results = self._fenice_model.score_batch(batch, document_cache_data=validated_cache)
             else:
                 results = self._fenice_model.score_batch(batch)
                 
@@ -136,13 +164,14 @@ class FENICEScorer(BaseRule):
             raise RuntimeError(f"FENICE evaluation failed: {e}") from e
 
     def batch_evaluate(
-        self, sources: List[str], summaries: List[str]
+        self, sources: List[str], summaries: List[str], cache_data: Optional[Dict] = None
     ) -> List[Dict[str, Any]]:
         """Evaluate multiple source-summary pairs efficiently.
 
         Args:
             sources: List of source texts
             summaries: List of summaries
+            cache_data: Optional pre-computed document cache data
 
         Returns:
             List of evaluation results
@@ -159,13 +188,22 @@ class FENICEScorer(BaseRule):
         ]
 
         try:
-            # Check for cached document data
-            cached_data = get_fenice_document_cache()
+            # Validate cache data if provided
+            validated_cache = None
+            if cache_data:
+                validated_cache = {}
+                for i, source in enumerate(sources):
+                    if i in cache_data and _validate_cache_for_document(cache_data[i], source):
+                        validated_cache[i] = cache_data[i]
+                    elif i in cache_data:
+                        self.logger.warning(f"Cache validation failed for document {i}, falling back to runtime computation")
+                
+                if validated_cache:
+                    self.logger.debug(f"Using validated cached document data for {len(validated_cache)} out of {len(sources)} documents in batch")
             
             # Get FENICE results for entire batch with or without cache
-            if cached_data:
-                self.logger.debug(f"Using cached document data for FENICE batch evaluation of {len(batch)} items")
-                fenice_results = self._fenice_model.score_batch(batch, document_cache_data=cached_data)
+            if validated_cache:
+                fenice_results = self._fenice_model.score_batch(batch, document_cache_data=validated_cache)
             else:
                 fenice_results = self._fenice_model.score_batch(batch)
 
