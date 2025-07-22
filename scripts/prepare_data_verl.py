@@ -38,6 +38,7 @@ from rlvr_summary.data.batch_processor import create_data_pipeline
 try:
     from rlvr_summary.fenice.FENICE import FENICE
     from rlvr_summary.fenice.utils.utils import split_into_sentences_batched
+
     FENICE_AVAILABLE = True
 except ImportError:
     logger.warning("FENICE not available - document caching will be skipped")
@@ -50,27 +51,27 @@ logger = logging.getLogger(__name__)
 def preprocess_documents_for_fenice(documents: List[str]) -> Dict[str, Dict]:
     """
     Pre-process documents for FENICE caching to avoid runtime computation.
-    
+
     Args:
         documents: List of document texts
-        
+
     Returns:
         Dictionary mapping document indices to cached FENICE data
     """
     if not FENICE_AVAILABLE:
         logger.warning("FENICE not available - returning empty cache")
         return {}
-        
+
     logger.info(f"Pre-processing {len(documents)} documents for FENICE caching...")
-    
+
     try:
         # Import document key generation for validation
         import hashlib
-        
+
         def get_document_key(document: str) -> str:
             """Generate a stable key for document cache validation."""
-            return hashlib.sha256(document.encode('utf-8')).hexdigest()[:16]
-        
+            return hashlib.sha256(document.encode("utf-8")).hexdigest()[:16]
+
         # Create temporary FENICE instance for processing
         fenice = FENICE(
             use_coref=False,  # Start with just sentence caching for safety
@@ -78,27 +79,29 @@ def preprocess_documents_for_fenice(documents: List[str]) -> Dict[str, Dict]:
             sliding_paragraphs=True,
             sliding_stride=1,
         )
-        
+
         # Cache sentences for all documents
         all_sentences = split_into_sentences_batched(
             documents, batch_size=32, return_offsets=True
         )
-        
+
         document_cache = {}
         for i, sentences in enumerate(all_sentences):
             doc_id = fenice.get_id(i, documents[i])
-            
+
             # Store the essential cached data with document key for validation
             document_cache[i] = {
-                'doc_id': doc_id,
-                'document_key': get_document_key(documents[i]),  # Add validation key
-                'sentences': sentences,  # List of (sentence, start_offset, end_offset)
-                'document_text': documents[i],
+                "doc_id": doc_id,
+                "document_key": get_document_key(documents[i]),  # Add validation key
+                "sentences": sentences,  # List of (sentence, start_offset, end_offset)
+                "document_text": documents[i],
             }
-        
-        logger.info(f"✅ Successfully cached {len(document_cache)} documents with validation keys")
+
+        logger.info(
+            f"✅ Successfully cached {len(document_cache)} documents with validation keys"
+        )
         return document_cache
-        
+
     except Exception as e:
         logger.error(f"Failed to pre-process documents for FENICE: {e}")
         return {}
@@ -107,20 +110,20 @@ def preprocess_documents_for_fenice(documents: List[str]) -> Dict[str, Dict]:
 def create_fenice_document_cache(documents: List[str]) -> Dict:
     """
     Create FENICE document cache for the extra_info field.
-    
+
     Args:
         documents: List of document texts
-        
+
     Returns:
         Cache dictionary to be stored in extra_info.fenice_document_cache
     """
     cache = preprocess_documents_for_fenice(documents)
-    
+
     if cache:
         logger.info(f"Created FENICE document cache for {len(cache)} documents")
     else:
         logger.warning("FENICE document cache is empty")
-        
+
     return cache
 
 
@@ -175,7 +178,7 @@ def prepare_rlvr_dataset(
 
     # Convert to VERL format
     verl_data = []
-    
+
     # Pre-process documents for FENICE caching
     logger.info("🔄 Pre-processing documents for FENICE caching...")
     documents = []
@@ -183,10 +186,10 @@ def prepare_rlvr_dataset(
         processed_item = item.get("processed", item.get("original", {}))
         article = processed_item.get("article", "")
         documents.append(article)
-    
+
     # Create FENICE document cache
     fenice_document_cache = create_fenice_document_cache(documents)
-    
+
     # Now create VERL data with cache
     for idx, item in enumerate(pipeline_result["data"]):
         processed_item = item.get("processed", item.get("original", {}))
@@ -230,7 +233,22 @@ def prepare_rlvr_dataset(
     parquet_path = output_dir / f"{split}_data.parquet"
     json_path = output_dir / f"{split}_data.json"
 
-    df = pd.DataFrame(verl_data)
+    # Prepare data for parquet - serialize complex objects to JSON strings
+    import json
+
+    verl_data_for_parquet = []
+    for sample in verl_data:
+        sample_copy = sample.copy()
+        # Serialize the fenice_document_cache to JSON string for parquet compatibility
+        if "fenice_document_cache" in sample_copy["extra_info"]:
+            cache_data = sample_copy["extra_info"]["fenice_document_cache"]
+            sample_copy["extra_info"] = sample_copy["extra_info"].copy()
+            sample_copy["extra_info"]["fenice_document_cache"] = (
+                json.dumps(cache_data) if cache_data else "{}"
+            )
+        verl_data_for_parquet.append(sample_copy)
+
+    df = pd.DataFrame(verl_data_for_parquet)
     df.to_parquet(parquet_path, index=False)
 
     # Also save as JSON for manual inspection

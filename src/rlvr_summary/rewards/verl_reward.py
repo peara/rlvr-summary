@@ -8,8 +8,8 @@ from typing import Optional
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from rlvr_summary.rewards.fenice import _get_document_key, _validate_cache_for_document
 from rlvr_summary.rewards.integration import create_reward_integrator
-from rlvr_summary.rewards.fenice import _validate_cache_for_document, _get_document_key
 
 # Create the reward integrator once at module level for efficiency
 _config_path = project_root / "configs" / "rewards" / "rule_bundle.yaml"
@@ -61,15 +61,32 @@ def compute_score(
     # Extract and validate FENICE cache if available
     context = None
     if extra_info and isinstance(extra_info, dict):
-        cache_data = extra_info.get('fenice_document_cache')
+        cache_data = extra_info.get("fenice_document_cache")
+
+        # Handle JSON-serialized cache data from parquet files
+        if isinstance(cache_data, str):
+            try:
+                import json
+
+                cache_data = json.loads(cache_data)
+            except (json.JSONDecodeError, ValueError) as e:
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to deserialize FENICE cache: {e}")
+                cache_data = None
+
         if cache_data and _validate_cache_for_document(cache_data, source_text):
-            context = {'fenice_cache': cache_data}
+            context = {"fenice_cache": cache_data}
         elif cache_data:
             # Cache validation failed - log but continue with runtime computation
             import logging
+
             logger = logging.getLogger(__name__)
-            logger.warning("FENICE cache validation failed, falling back to runtime computation")
-    
+            logger.warning(
+                "FENICE cache validation failed, falling back to runtime computation"
+            )
+
     # Use the reward integrator with cache context
     reward_integrator = _get_reward_integrator()
     score = reward_integrator.compute_reward(source_text, solution_str, context=context)
