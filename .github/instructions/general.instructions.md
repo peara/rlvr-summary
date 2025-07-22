@@ -5,7 +5,7 @@ When there are uncertainty, unreasonable or not optimal points in an issue, shou
 We are doing a research project, so:
 - things must work, or just fail. We don't need things run but not correct.
 - backward-compatible is not necessary.
-- no need for demo, better update README and tests.
+- do not write demo, simulation, or any files that not actually run.
 - we are working with cutting-edge tools and libs. if you don't know the docs, ask immediately. DO NOT GUESS.
 - no fallback in code, it should work or fail, this is a research project, not production code.
 
