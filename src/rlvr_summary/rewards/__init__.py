@@ -1,6 +1,8 @@
 """Reward systems and scoring."""
 
 from .base import BaseRule, RuleEvaluationResult, TextProcessor
+from .bertscore import BertScoreConsistencyRule, create_bertscore_scorer
+from .fenice import FENICEScorer, create_fenice_scorer
 from .integration import (
     RewardSystemIntegrator,
     create_reward_function,
@@ -18,7 +20,6 @@ from .rules import (
     NumberConsistencyRule,
     ProfanityDetectionRule,
 )
-from .fenice import FENICEScorer, create_fenice_scorer
 
 __all__ = [
     "BaseRule",
@@ -31,6 +32,8 @@ __all__ = [
     "FluencyRule",
     "FENICEScorer",
     "create_fenice_scorer",
+    "BertScoreConsistencyRule",
+    "create_bertscore_scorer",
     "RuleBundleRewardSystem",
     "load_rule_bundle_from_config",
     "create_default_rule_bundle",

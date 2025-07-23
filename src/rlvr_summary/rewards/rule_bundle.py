@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from .base import BaseRule, RuleEvaluationResult
+from .bertscore import BertScoreConsistencyRule
+from .fenice import FENICEScorer
 from .rules import (
     EntityOverlapRule,
     FluencyRule,
@@ -12,7 +14,6 @@ from .rules import (
     NumberConsistencyRule,
     ProfanityDetectionRule,
 )
-from .fenice import FENICEScorer
 
 
 class RuleBundleRewardSystem:
@@ -74,12 +75,19 @@ class RuleBundleRewardSystem:
             self.rules["fluency"] = FluencyRule(
                 weight=weights["fluency"], config=self.config.get("fluency", {})
             )
-        
-        # FENICE factual consistency rule
-        if "fenice_factual_consistency" in weights:
-            self.rules["fenice_factual_consistency"] = FENICEScorer(
-                weight=weights["fenice_factual_consistency"], 
-                config=self.config.get("fenice", {})
+
+        # FENICE factual consistency rule (DISABLED - too slow for training)
+        # if "fenice_factual_consistency" in weights:
+        #     self.rules["fenice_factual_consistency"] = FENICEScorer(
+        #         weight=weights["fenice_factual_consistency"],
+        #         config=self.config.get("fenice", {})
+        #     )
+
+        # BertScore factual consistency rule (Binary scoring)
+        if "bertscore_factual_consistency" in weights:
+            self.rules["bertscore_factual_consistency"] = BertScoreConsistencyRule(
+                weight=weights["bertscore_factual_consistency"],
+                config=self.config.get("bertscore", {}),
             )
 
     def _validate_config(self) -> None:
@@ -106,7 +114,11 @@ class RuleBundleRewardSystem:
                 )
 
     def evaluate(
-        self, source: str, summary: str, log_details: bool = False, context: Optional[Dict] = None
+        self,
+        source: str,
+        summary: str,
+        log_details: bool = False,
+        context: Optional[Dict] = None,
     ) -> RuleEvaluationResult:
         """Evaluate a summary using all configured rules.
 
@@ -137,13 +149,13 @@ class RuleBundleRewardSystem:
         for rule_name, rule in self.rules.items():
             try:
                 # Check if rule supports context (e.g., cache data)
-                if hasattr(rule, 'evaluate_with_context') and context:
+                if hasattr(rule, "evaluate_with_context") and context:
                     # Rule supports context - pass it along
                     result = rule.evaluate_with_context(source, summary, context)
                 else:
                     # Standard evaluation
                     result = rule.evaluate(source, summary)
-                    
+
                 rule_scores[rule_name] = result["score"]
                 rule_details[rule_name] = result["details"]
                 rule_passed[rule_name] = result["passed"]
@@ -197,7 +209,11 @@ class RuleBundleRewardSystem:
         return result
 
     def evaluate_batch(
-        self, sources: List[str], summaries: List[str], log_details: bool = False, context: Optional[Dict] = None
+        self,
+        sources: List[str],
+        summaries: List[str],
+        log_details: bool = False,
+        context: Optional[Dict] = None,
     ) -> List[RuleEvaluationResult]:
         """Evaluate a batch of summaries.
 
@@ -225,7 +241,9 @@ class RuleBundleRewardSystem:
             if context and isinstance(context, dict):
                 item_context = context.get(i)
 
-            result = self.evaluate(source, summary, log_details=False, context=item_context)
+            result = self.evaluate(
+                source, summary, log_details=False, context=item_context
+            )
             results.append(result)
 
         if log_details:

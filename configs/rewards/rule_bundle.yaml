@@ -7,7 +7,8 @@ weights:
   number_consistency: 0.15
   profanity_penalty: 0.05
   fluency: 0.05
-  fenice_factual_consistency: 0.35
+  bertscore_factual_consistency: 0.35
+  # fenice_factual_consistency: 0.35  # DISABLED - too slow for PPO training
 
 # Length constraint settings
 length:
@@ -40,7 +41,15 @@ fluency:
   min_score: 0.5
   model_name: null  # Use default model
 
-# FENICE factual consistency
-fenice:
-  threshold: 0.5
-  batch_size: 8
+# FENICE factual consistency (DISABLED - replaced with BertScore)
+# fenice:
+#   threshold: 0.5
+#   batch_size: 8
+
+# BertScore factual consistency (Binary scoring - fast and effective)
+bertscore:
+  threshold: 0.82  # High threshold for quality summaries (1.0 if >= threshold, 0.0 otherwise)
+  model_type: "distilbert-base-uncased"  # Fast and lightweight model
+  batch_size: 32
+  use_gpu: true
+  use_fast_tokenizer: true
