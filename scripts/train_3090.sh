@@ -9,6 +9,7 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.model.path=Qwen/Qwen2.5-0.5B-Instruct \
   actor_rollout_ref.model.enable_gradient_checkpointing=True \
   actor_rollout_ref.model.enable_activation_offload=True \
+  actor_rollout_ref.model.fsdp_config.model_dtype=bf16 \
   actor_rollout_ref.actor.optim.lr=3e-5 \
   actor_rollout_ref.actor.optim.weight_decay=0.01 \
   actor_rollout_ref.actor.optim.lr_warmup_steps_ratio=0.2 \
@@ -26,6 +27,7 @@ python3 -m verl.trainer.main_ppo \
   actor_rollout_ref.rollout.max_num_batched_tokens=2200 \
   actor_rollout_ref.rollout.max_model_len=2200 \
   actor_rollout_ref.rollout.max_num_seqs=8 \
+  actor_rollout_ref.rollout.dtype=bf16 \
   actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu=4 \
   critic.optim.lr=3e-5 \
   critic.optim.warmup_style=cosine \

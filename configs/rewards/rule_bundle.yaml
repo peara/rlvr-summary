@@ -13,11 +13,11 @@ weights:
 # Length constraint settings
 length:
   min_words: 20
-  max_words: 100
-  optimal_range: [30, 80]
+  max_words: 200
+  optimal_range: [30, 120]
   penalty_factor: 0.5
 
-# Entity overlap settings  
+# Entity overlap settings
 entity:
   min_overlap: 0.3
   optimal_overlap: 0.7
@@ -41,15 +41,8 @@ fluency:
   min_score: 0.5
   model_name: null  # Use default model
 
-# FENICE factual consistency (DISABLED - replaced with BertScore)
-# fenice:
-#   threshold: 0.5
-#   batch_size: 8
-
-# BertScore factual consistency (Binary scoring - fast and effective)
-bertscore:
-  threshold: 0.82  # High threshold for quality summaries (1.0 if >= threshold, 0.0 otherwise)
-  model_type: "distilbert-base-uncased"  # Fast and lightweight model
-  batch_size: 32
-  use_gpu: true
-  use_fast_tokenizer: true
+# BART-MNLI specific configuration
+bart_mnli:
+  threshold: 0.8            # Entailment probability threshold for binary scoring
+  max_length: 1024          # Maximum sequence length (words) for truncation
+  device: "auto"            # Device: "cuda", "cpu", or "auto"

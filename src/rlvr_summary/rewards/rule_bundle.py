@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+from .bart_mnli import BartMNLIConsistencyRule
 from .base import BaseRule, RuleEvaluationResult
 from .bertscore import BertScoreConsistencyRule
 from .fenice import FENICEScorer
@@ -88,6 +89,13 @@ class RuleBundleRewardSystem:
             self.rules["bertscore_factual_consistency"] = BertScoreConsistencyRule(
                 weight=weights["bertscore_factual_consistency"],
                 config=self.config.get("bertscore", {}),
+            )
+
+        # BART-MNLI factual consistency rule (NLI-based binary scoring)
+        if "bart_mnli_factual_consistency" in weights:
+            self.rules["bart_mnli_factual_consistency"] = BartMNLIConsistencyRule(
+                weight=weights["bart_mnli_factual_consistency"],
+                config=self.config.get("bart_mnli", {}),
             )
 
     def _validate_config(self) -> None:
