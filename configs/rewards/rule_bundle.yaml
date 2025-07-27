@@ -7,8 +7,7 @@ weights:
   number_consistency: 0.15
   profanity_penalty: 0.05
   fluency: 0.05
-  bertscore_factual_consistency: 0.35
-  # fenice_factual_consistency: 0.35  # DISABLED - too slow for PPO training
+  bart_mnli_factual_consistency: 0.35
 
 # Length constraint settings
 length:
