@@ -44,4 +44,4 @@ fluency:
 bart_mnli:
   threshold: 0.8            # Entailment probability threshold for binary scoring
   max_length: 1024          # Maximum sequence length (words) for truncation
-  device: "auto"            # Device: "cuda", "cpu", or "auto"
+  device: "cuda"            # Device: "cuda", "cpu", or "auto"

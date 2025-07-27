@@ -8,6 +8,14 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from .base import BaseRule
 
+# Import VERL's device management if available
+try:
+    from verl.utils.device import get_torch_device, is_cuda_available
+
+    USE_VERL_DEVICE = True
+except ImportError:
+    USE_VERL_DEVICE = False
+
 
 class BartMNLIConsistencyRule(BaseRule):
     """BART-MNLI based factual consistency rule using Natural Language Inference.
@@ -36,11 +44,20 @@ class BartMNLIConsistencyRule(BaseRule):
         if device_config == "cpu":
             self.device = "cpu"
         elif device_config == "cuda":
-            if not torch.cuda.is_available():
-                raise RuntimeError("CUDA requested but not available")
+            # Use VERL's device detection if available, otherwise fall back to PyTorch
+            if USE_VERL_DEVICE:
+                if not is_cuda_available:
+                    raise RuntimeError("CUDA requested but not available")
+            else:
+                if not torch.cuda.is_available():
+                    raise RuntimeError("CUDA requested but not available")
             self.device = "cuda"
         elif device_config == "auto":
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+            # Use VERL's device detection if available, otherwise fall back to PyTorch
+            if USE_VERL_DEVICE:
+                self.device = "cuda" if is_cuda_available else "cpu"
+            else:
+                self.device = "cuda" if torch.cuda.is_available() else "cpu"
         else:
             raise ValueError(f"Invalid device config: {device_config}")
 
@@ -67,7 +84,14 @@ class BartMNLIConsistencyRule(BaseRule):
             # Use manual PyTorch approach for direct NLI evaluation
             self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model.to(self.device)
+
+            # Move model to device using VERL-compatible approach
+            if USE_VERL_DEVICE and self.device != "cpu":
+                device = get_torch_device()
+                self.model = self.model.to(device)
+            else:
+                self.model = self.model.to(self.device)
+
             self.model.eval()
 
         except Exception as e:
