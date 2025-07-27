@@ -8,15 +8,8 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from .base import BaseRule
 
-# Import VERL's device management if available
-try:
-    from verl.utils.device import get_torch_device, is_cuda_available
-
-    USE_VERL_DEVICE = True
-except ImportError:
-    USE_VERL_DEVICE = False
-
-
+from verl.utils.device import get_device_id, is_cuda_available
+    
 class BartMNLIConsistencyRule(BaseRule):
     """BART-MNLI based factual consistency rule using Natural Language Inference.
 
@@ -33,33 +26,24 @@ class BartMNLIConsistencyRule(BaseRule):
             config: Configuration dictionary with settings:
                 - threshold: Entailment probability threshold for binary scoring (default: 0.8)
                 - max_length: Maximum sequence length for truncation (default: 1024)
-                - device: Device to run model on (default: auto-detect)
         """
         super().__init__(weight, config)
 
         self.threshold = self.config.get("threshold", 0.8)
         self.max_length = self.config.get("max_length", 1024)
-
-        device_config = self.config.get("device", "auto")
-        if device_config == "cpu":
-            self.device = "cpu"
-        elif device_config == "cuda":
-            # Use VERL's device detection if available, otherwise fall back to PyTorch
-            if USE_VERL_DEVICE:
-                if not is_cuda_available:
-                    raise RuntimeError("CUDA requested but not available")
-            else:
-                if not torch.cuda.is_available():
-                    raise RuntimeError("CUDA requested but not available")
-            self.device = "cuda"
-        elif device_config == "auto":
-            # Use VERL's device detection if available, otherwise fall back to PyTorch
-            if USE_VERL_DEVICE:
-                self.device = "cuda" if is_cuda_available else "cpu"
-            else:
-                self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            raise ValueError(f"Invalid device config: {device_config}")
+        
+        # Always use CUDA - fail if not available
+        if not is_cuda_available():
+            raise RuntimeError("CUDA is required but not available")
+        
+        try:
+            self.device = get_device_id()
+            print(f"Using VERL device ID: {self.device}")
+            if self.device == "cpu":
+                raise RuntimeError("BART-MNLI requires a GPU, but got CPU")
+        except Exception as e:
+            self.logger.warning(f"VERL get_device_id() failed: {e}, falling back to cuda:0")
+            self.device = "cuda:0"
 
         self.logger = logging.getLogger(f"{__class__.__module__}.{__class__.__name__}")
 
@@ -85,13 +69,8 @@ class BartMNLIConsistencyRule(BaseRule):
             self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-            # Move model to device using VERL-compatible approach
-            if USE_VERL_DEVICE and self.device != "cpu":
-                device = get_torch_device()
-                self.model = self.model.to(device)
-            else:
-                self.model = self.model.to(self.device)
-
+            # Move model to CUDA
+            self.model = self.model.to(self.device, non_blocking=True)
             self.model.eval()
 
         except Exception as e:
@@ -146,7 +125,7 @@ class BartMNLIConsistencyRule(BaseRule):
             padding=True,
         )
 
-        inputs = inputs.to(self.device)
+        inputs = inputs.to(self.device, non_blocking=True)
 
         # Get model predictions
         with torch.no_grad():
