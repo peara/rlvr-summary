@@ -31,9 +31,18 @@ class BartMNLIConsistencyRule(BaseRule):
 
         self.threshold = self.config.get("threshold", 0.8)
         self.max_length = self.config.get("max_length", 1024)
-        self.device = self.config.get(
-            "device", "cuda" if torch.cuda.is_available() else "cpu"
-        )
+
+        device_config = self.config.get("device", "auto")
+        if device_config == "cpu":
+            self.device = "cpu"
+        elif device_config == "cuda":
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA requested but not available")
+            self.device = "cuda"
+        elif device_config == "auto":
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            raise ValueError(f"Invalid device config: {device_config}")
 
         self.logger = logging.getLogger(f"{__class__.__module__}.{__class__.__name__}")
 
