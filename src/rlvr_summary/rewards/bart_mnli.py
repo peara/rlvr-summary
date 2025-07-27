@@ -45,6 +45,11 @@ class BartMNLIConsistencyRule(BaseRule):
             f"max_length={self.max_length}, device={self.device}"
         )
 
+    @property
+    def name(self) -> str:
+        """Return the name of this rule."""
+        return "BART-MNLI Factual Consistency"
+
     def _initialize_model(self) -> None:
         """Initialize the BART-MNLI model."""
         model_name = "facebook/bart-large-mnli"
